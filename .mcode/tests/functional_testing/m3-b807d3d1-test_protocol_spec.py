@@ -9,7 +9,7 @@ This script supports two modes:
 1. SRC Validation: Tests endpoints and captures responses (no expected_response)
 2. DST Contract Validation: Tests endpoints and validates responses match expected (has expected_response)
 
-Generated at: 2026-04-10T20:38:15.699454+00:00
+Generated at: 2026-04-10T20:45:40.635479+00:00
 Project: php-ecommerce
 Milestone: 3
 """
@@ -66,19 +66,69 @@ TEST_CASES: list[dict[str, Any]] = resolve_env_placeholders(
         "cleanup": null
     },
     {
+        "name": "create_order_happy_path",
+        "category": "HAPPY_PATH",
+        "endpoint": "/api/orders",
+        "method": "POST",
+        "description": "Place an order for a seed product (USB-C Hub, id=3) with sufficient stock. Verify 201 response with order details including items and calculated total.",
+        "request_data": {
+            "path": {},
+            "query": {},
+            "body": {
+                "items": [
+                    {
+                        "product_id": 3,
+                        "quantity": 2
+                    }
+                ]
+            }
+        },
+        "expected_status": 201,
+        "setup": null,
+        "cleanup": null
+    },
+    {
+        "name": "create_order_multiple_items",
+        "category": "HAPPY_PATH",
+        "endpoint": "/api/orders",
+        "method": "POST",
+        "description": "Place an order with multiple line items referencing different seed products. Verifies multi-item order creation works correctly.",
+        "request_data": {
+            "path": {},
+            "query": {},
+            "body": {
+                "items": [
+                    {
+                        "product_id": 1,
+                        "quantity": 3
+                    },
+                    {
+                        "product_id": 2,
+                        "quantity": 2
+                    }
+                ]
+            }
+        },
+        "expected_status": 201,
+        "setup": null,
+        "cleanup": null
+    },
+    {
         "name": "list_orders_after_creation",
         "category": "HAPPY_PATH",
         "endpoint": "/api/orders",
         "method": "GET",
-        "description": "Create a product, place an order, then verify the orders list returns 200 and is non-empty",
+        "description": "Create an order via setup, then verify the orders list returns 200",
         "setup": {
-            "endpoint": "/api/products",
+            "endpoint": "/api/orders",
             "method": "POST",
             "body": {
-                "name": "List Test Widget",
-                "description": "Product for testing order listing",
-                "price": 15.0,
-                "stock": 50
+                "items": [
+                    {
+                        "product_id": 4,
+                        "quantity": 1
+                    }
+                ]
             },
             "extract_id_from": "id"
         },
@@ -95,15 +145,17 @@ TEST_CASES: list[dict[str, Any]] = resolve_env_placeholders(
         "category": "HAPPY_PATH",
         "endpoint": "/api/orders/{id}",
         "method": "GET",
-        "description": "Create a product, place an order using it, then retrieve the order by ID and verify it includes line items with product_name",
+        "description": "Create an order via setup, then retrieve it by ID and verify it includes line items with product_name",
         "setup": {
-            "endpoint": "/api/products",
+            "endpoint": "/api/orders",
             "method": "POST",
             "body": {
-                "name": "Order Detail Widget",
-                "description": "Product for testing order retrieval",
-                "price": 24.99,
-                "stock": 30
+                "items": [
+                    {
+                        "product_id": 5,
+                        "quantity": 1
+                    }
+                ]
             },
             "extract_id_from": "id"
         },
@@ -132,74 +184,6 @@ TEST_CASES: list[dict[str, Any]] = resolve_env_placeholders(
         },
         "expected_status": 404,
         "setup": null,
-        "cleanup": null
-    },
-    {
-        "name": "create_order_happy_path",
-        "category": "HAPPY_PATH",
-        "endpoint": "/api/orders",
-        "method": "POST",
-        "description": "Create a product with sufficient stock, then place an order for it. Verify 201 response with order details including items and calculated total.",
-        "setup": {
-            "endpoint": "/api/products",
-            "method": "POST",
-            "body": {
-                "name": "Test Gadget Alpha",
-                "description": "A test product for order creation",
-                "price": 29.99,
-                "stock": 100
-            },
-            "extract_id_from": "id"
-        },
-        "request_data": {
-            "path": {},
-            "query": {},
-            "body": {
-                "items": [
-                    {
-                        "product_id": "$setup_id",
-                        "quantity": 2
-                    }
-                ]
-            }
-        },
-        "expected_status": 201,
-        "cleanup": null
-    },
-    {
-        "name": "create_order_multiple_items",
-        "category": "HAPPY_PATH",
-        "endpoint": "/api/orders",
-        "method": "POST",
-        "description": "Create a product and place an order with multiple line items referencing it. Verifies multi-item order creation works correctly.",
-        "setup": {
-            "endpoint": "/api/products",
-            "method": "POST",
-            "body": {
-                "name": "Multi Item Widget",
-                "description": "Product for multi-item order test",
-                "price": 10.5,
-                "stock": 200
-            },
-            "extract_id_from": "id"
-        },
-        "request_data": {
-            "path": {},
-            "query": {},
-            "body": {
-                "items": [
-                    {
-                        "product_id": "$setup_id",
-                        "quantity": 3
-                    },
-                    {
-                        "product_id": "$setup_id",
-                        "quantity": 5
-                    }
-                ]
-            }
-        },
-        "expected_status": 201,
         "cleanup": null
     },
     {
@@ -239,38 +223,22 @@ TEST_CASES: list[dict[str, Any]] = resolve_env_placeholders(
         "category": "INVALID_INPUT",
         "endpoint": "/api/orders",
         "method": "POST",
-        "description": "Create a product with stock=2, then try to order quantity=50. Expect 400 error for insufficient stock.",
-        "setup": {
-            "endpoint": "/api/products",
-            "method": "POST",
-            "body": {
-                "name": "Low Stock Item",
-                "description": "Product with very limited stock",
-                "price": 5.99,
-                "stock": 2
-            },
-            "extract_id_from": "id"
-        },
+        "description": "Try to order quantity 100 of seed product Webcam HD (id=5, stock=60). Expect 400 error for insufficient stock.",
         "request_data": {
             "path": {},
             "query": {},
             "body": {
                 "items": [
                     {
-                        "product_id": "$setup_id",
-                        "quantity": 50
+                        "product_id": 5,
+                        "quantity": 100
                     }
                 ]
             }
         },
         "expected_status": 400,
-        "cleanup": {
-            "endpoint": "/api/products/{id}",
-            "method": "DELETE",
-            "path": {
-                "id": "$setup_id"
-            }
-        }
+        "setup": null,
+        "cleanup": null
     },
     {
         "name": "create_order_product_not_found",
