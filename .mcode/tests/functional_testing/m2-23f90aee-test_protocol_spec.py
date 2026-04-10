@@ -9,7 +9,7 @@ This script supports two modes:
 1. SRC Validation: Tests endpoints and captures responses (no expected_response)
 2. DST Contract Validation: Tests endpoints and validates responses match expected (has expected_response)
 
-Generated at: 2026-04-10T21:31:01.005675+00:00
+Generated at: 2026-04-10T21:37:22.552299+00:00
 Project: php-ecommerce
 Milestone: 2
 """
@@ -135,7 +135,7 @@ TEST_CASES: list[dict[str, Any]] = resolve_env_placeholders(
         "category": "MISSING_REQUIRED",
         "endpoint": "/api/products",
         "method": "POST",
-        "description": "Attempt to create a product without the required name field \u2014 expect 422 validation error",
+        "description": "Attempt to create a product without the required name field \u2014 expect 400 error",
         "request_data": {
             "path": {},
             "query": {},
@@ -143,7 +143,7 @@ TEST_CASES: list[dict[str, Any]] = resolve_env_placeholders(
                 "price": 10.0
             }
         },
-        "expected_status": 422,
+        "expected_status": 400,
         "setup": null,
         "cleanup": null
     },
@@ -152,7 +152,7 @@ TEST_CASES: list[dict[str, Any]] = resolve_env_placeholders(
         "category": "MISSING_REQUIRED",
         "endpoint": "/api/products",
         "method": "POST",
-        "description": "Attempt to create a product without the required price field \u2014 expect 422 validation error",
+        "description": "Attempt to create a product without the required price field \u2014 expect 400 error",
         "request_data": {
             "path": {},
             "query": {},
@@ -160,7 +160,7 @@ TEST_CASES: list[dict[str, Any]] = resolve_env_placeholders(
                 "name": "No Price Product"
             }
         },
-        "expected_status": 422,
+        "expected_status": 400,
         "setup": null,
         "cleanup": null
     },
@@ -169,7 +169,7 @@ TEST_CASES: list[dict[str, Any]] = resolve_env_placeholders(
         "category": "INVALID_INPUT",
         "endpoint": "/api/products",
         "method": "POST",
-        "description": "Attempt to create a product with price = 0 \u2014 expect 422 validation error since price must be > 0",
+        "description": "Attempt to create a product with price = 0 \u2014 expect 400 error since price must be > 0",
         "request_data": {
             "path": {},
             "query": {},
@@ -178,7 +178,7 @@ TEST_CASES: list[dict[str, Any]] = resolve_env_placeholders(
                 "price": 0
             }
         },
-        "expected_status": 422,
+        "expected_status": 400,
         "setup": null,
         "cleanup": null
     },
@@ -187,7 +187,7 @@ TEST_CASES: list[dict[str, Any]] = resolve_env_placeholders(
         "category": "INVALID_INPUT",
         "endpoint": "/api/products",
         "method": "POST",
-        "description": "Attempt to create a product with negative stock \u2014 expect 422 validation error",
+        "description": "Attempt to create a product with negative stock \u2014 expect 400 error",
         "request_data": {
             "path": {},
             "query": {},
@@ -197,7 +197,7 @@ TEST_CASES: list[dict[str, Any]] = resolve_env_placeholders(
                 "stock": -5
             }
         },
-        "expected_status": 422,
+        "expected_status": 400,
         "setup": null,
         "cleanup": null
     },
