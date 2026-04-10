@@ -9,7 +9,7 @@ This script supports two modes:
 1. SRC Validation: Tests endpoints and captures responses (no expected_response)
 2. DST Contract Validation: Tests endpoints and validates responses match expected (has expected_response)
 
-Generated at: 2026-04-10T21:43:35.142601+00:00
+Generated at: 2026-04-10T21:47:02.874942+00:00
 Project: php-ecommerce
 Milestone: 3
 """
@@ -55,25 +55,15 @@ TEST_CASES: list[dict[str, Any]] = resolve_env_placeholders(
         "category": "HAPPY_PATH",
         "endpoint": "/api/orders",
         "method": "POST",
-        "description": "Create a product with stock, then create an order for that product. Verifies 201 response with order detail including items.",
-        "setup": {
-            "endpoint": "/api/products",
-            "method": "POST",
-            "body": {
-                "name": "Order Test Widget",
-                "description": "A widget for order creation testing",
-                "price": 25.5,
-                "stock": 100
-            },
-            "extract_id_from": "id"
-        },
+        "description": "Create an order for seed product 3 (USB-C Hub, stock 200). Verifies 201 response with order detail including items.",
+        "setup": null,
         "request_data": {
             "path": {},
             "query": {},
             "body": {
                 "items": [
                     {
-                        "product_id": "$setup_id",
+                        "product_id": 3,
                         "quantity": 2
                     }
                 ]
@@ -119,38 +109,22 @@ TEST_CASES: list[dict[str, Any]] = resolve_env_placeholders(
         "category": "INVALID_INPUT",
         "endpoint": "/api/orders",
         "method": "POST",
-        "description": "Create a product with stock of 3, then attempt to order 50 units. Expects 400 insufficient stock error. Order creation fails so product can be cleaned up.",
-        "setup": {
-            "endpoint": "/api/products",
-            "method": "POST",
-            "body": {
-                "name": "Low Stock Item",
-                "description": "Product with very limited stock for testing",
-                "price": 10.0,
-                "stock": 3
-            },
-            "extract_id_from": "id"
-        },
+        "description": "Attempt to order 999999 units of seed product 5 (Webcam HD, stock 60). Expects 400 insufficient stock error.",
+        "setup": null,
         "request_data": {
             "path": {},
             "query": {},
             "body": {
                 "items": [
                     {
-                        "product_id": "$setup_id",
-                        "quantity": 50
+                        "product_id": 5,
+                        "quantity": 999999
                     }
                 ]
             }
         },
         "expected_status": 400,
-        "cleanup": {
-            "endpoint": "/api/products/{id}",
-            "method": "DELETE",
-            "path": {
-                "id": "$setup_id"
-            }
-        }
+        "cleanup": null
     },
     {
         "name": "create_order_nonexistent_product",
