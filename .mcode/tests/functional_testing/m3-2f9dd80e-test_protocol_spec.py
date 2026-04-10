@@ -9,7 +9,7 @@ This script supports two modes:
 1. SRC Validation: Tests endpoints and captures responses (no expected_response)
 2. DST Contract Validation: Tests endpoints and validates responses match expected (has expected_response)
 
-Generated at: 2026-04-10T22:07:54.537299+00:00
+Generated at: 2026-04-10T22:11:49.402471+00:00
 Project: php-ecommerce
 Milestone: 3
 """
@@ -51,11 +51,26 @@ def resolve_env_placeholders(obj: Any) -> Any:
 TEST_CASES: list[dict[str, Any]] = resolve_env_placeholders(
     json.loads(r'''[
     {
-        "name": "create_order_happy_path",
+        "name": "list_orders",
         "category": "HAPPY_PATH",
+        "description": "List all orders and verify 200 response with JSON array.",
+        "endpoint": "/api/orders",
+        "method": "GET",
+        "setup": null,
+        "request_data": {
+            "path": {},
+            "query": {},
+            "body": null
+        },
+        "expected_status": 200,
+        "cleanup": null
+    },
+    {
+        "name": "create_order_with_seed_product",
+        "category": "HAPPY_PATH",
+        "description": "Create order for seed product 3 (USB-C Hub, stock 200, price 49.99) with quantity 2.",
         "endpoint": "/api/orders",
         "method": "POST",
-        "description": "Create an order for seed product 3 (USB-C Hub, stock 200). Verifies 201 response with order detail and items.",
         "setup": null,
         "request_data": {
             "path": {},
@@ -73,11 +88,11 @@ TEST_CASES: list[dict[str, Any]] = resolve_env_placeholders(
         "cleanup": null
     },
     {
-        "name": "create_order_empty_items",
+        "name": "create_order_empty_items_array",
         "category": "INVALID_INPUT",
+        "description": "Empty items array should return 400.",
         "endpoint": "/api/orders",
         "method": "POST",
-        "description": "Attempt to create an order with an empty items array. Expects 400 validation error.",
         "setup": null,
         "request_data": {
             "path": {},
@@ -90,11 +105,11 @@ TEST_CASES: list[dict[str, Any]] = resolve_env_placeholders(
         "cleanup": null
     },
     {
-        "name": "create_order_missing_items_field",
+        "name": "create_order_no_items_field",
         "category": "MISSING_REQUIRED",
+        "description": "Missing items field should return 400.",
         "endpoint": "/api/orders",
         "method": "POST",
-        "description": "Attempt to create an order without the required items field. Expects 400 validation error.",
         "setup": null,
         "request_data": {
             "path": {},
@@ -105,11 +120,11 @@ TEST_CASES: list[dict[str, Any]] = resolve_env_placeholders(
         "cleanup": null
     },
     {
-        "name": "create_order_insufficient_stock",
+        "name": "create_order_stock_exceeded",
         "category": "INVALID_INPUT",
+        "description": "Ordering 999999 units of seed product 5 (stock 60) should return 400.",
         "endpoint": "/api/orders",
         "method": "POST",
-        "description": "Attempt to order 999999 units of seed product 5 (Webcam HD, stock 60). Expects 400 insufficient stock error.",
         "setup": null,
         "request_data": {
             "path": {},
@@ -127,11 +142,11 @@ TEST_CASES: list[dict[str, Any]] = resolve_env_placeholders(
         "cleanup": null
     },
     {
-        "name": "create_order_nonexistent_product",
+        "name": "create_order_product_not_found",
         "category": "INVALID_INPUT",
+        "description": "Referencing non-existent product 999999 should return 400.",
         "endpoint": "/api/orders",
         "method": "POST",
-        "description": "Attempt to create an order referencing a non-existent product ID. Expects 400 product not found error.",
         "setup": null,
         "request_data": {
             "path": {},
@@ -149,26 +164,11 @@ TEST_CASES: list[dict[str, Any]] = resolve_env_placeholders(
         "cleanup": null
     },
     {
-        "name": "list_orders_happy_path",
+        "name": "get_order_by_id",
         "category": "HAPPY_PATH",
-        "endpoint": "/api/orders",
-        "method": "GET",
-        "description": "List all orders. Expects 200 with a JSON array response.",
-        "setup": null,
-        "request_data": {
-            "path": {},
-            "query": {},
-            "body": null
-        },
-        "expected_status": 200,
-        "cleanup": null
-    },
-    {
-        "name": "get_order_by_id_happy_path",
-        "category": "HAPPY_PATH",
+        "description": "Create order for seed product 1 then retrieve it by ID.",
         "endpoint": "/api/orders/{order_id}",
         "method": "GET",
-        "description": "Create an order using seed product 1 (Wireless Mouse, stock 150), then retrieve it by ID. Verifies order detail includes items array with product_name.",
         "setup": {
             "endpoint": "/api/orders",
             "method": "POST",
@@ -193,11 +193,11 @@ TEST_CASES: list[dict[str, Any]] = resolve_env_placeholders(
         "cleanup": null
     },
     {
-        "name": "get_order_not_found",
+        "name": "get_order_missing",
         "category": "NOT_FOUND",
+        "description": "Non-existent order 999999 should return 404.",
         "endpoint": "/api/orders/{order_id}",
         "method": "GET",
-        "description": "Attempt to retrieve a non-existent order. Expects 404 with error message.",
         "setup": null,
         "request_data": {
             "path": {
@@ -210,11 +210,11 @@ TEST_CASES: list[dict[str, Any]] = resolve_env_placeholders(
         "cleanup": null
     },
     {
-        "name": "delete_product_conflict_with_order",
+        "name": "delete_product_with_orders",
         "category": "HAPPY_PATH",
+        "description": "Create order for seed product 2 then try to delete it. Expects 409 (FK constraint).",
         "endpoint": "/api/products/{product_id}",
         "method": "DELETE",
-        "description": "Create an order referencing seed product 2 (Mechanical Keyboard), then attempt to delete that product. Expects 409 Conflict because the product is referenced by order items (FK ON DELETE RESTRICT).",
         "setup": {
             "endpoint": "/api/orders",
             "method": "POST",
@@ -239,19 +239,19 @@ TEST_CASES: list[dict[str, Any]] = resolve_env_placeholders(
         "cleanup": null
     },
     {
-        "name": "delete_product_no_orders_success",
+        "name": "delete_product_without_orders",
         "category": "HAPPY_PATH",
+        "description": "Create a fresh product then delete it. Expects 204.",
         "endpoint": "/api/products/{product_id}",
         "method": "DELETE",
-        "description": "Create a product with no orders referencing it, then delete it. Expects 204 No Content.",
         "setup": {
             "endpoint": "/api/products",
             "method": "POST",
             "body": {
-                "name": "Deletable Product",
-                "description": "Product with no order references",
-                "price": 20.0,
-                "stock": 10
+                "name": "Temp Product",
+                "description": "For deletion test",
+                "price": 15.0,
+                "stock": 5
             },
             "extract_id_from": "id"
         },
