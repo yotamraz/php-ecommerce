@@ -9,7 +9,7 @@ This script supports two modes:
 1. SRC Validation: Tests endpoints and captures responses (no expected_response)
 2. DST Contract Validation: Tests endpoints and validates responses match expected (has expected_response)
 
-Generated at: 2026-04-10T21:58:33.187206+00:00
+Generated at: 2026-04-10T22:01:55.570373+00:00
 Project: php-ecommerce
 Milestone: 3
 """
@@ -55,7 +55,7 @@ TEST_CASES: list[dict[str, Any]] = resolve_env_placeholders(
         "category": "HAPPY_PATH",
         "endpoint": "/api/orders",
         "method": "POST",
-        "description": "Create an order for seed product 3 (USB-C Hub, stock 200). Verifies 201 response with order detail including items.",
+        "description": "Create an order for seed product 3 (USB-C Hub, stock 200). Verifies 201 response with order detail and items.",
         "setup": null,
         "request_data": {
             "path": {},
