@@ -9,7 +9,7 @@ This script supports two modes:
 1. SRC Validation: Tests endpoints and captures responses (no expected_response)
 2. DST Contract Validation: Tests endpoints and validates responses match expected (has expected_response)
 
-Generated at: 2026-04-10T20:14:03.644180+00:00
+Generated at: 2026-04-10T20:20:33.479016+00:00
 Project: php-ecommerce
 Milestone: 1
 """
@@ -98,13 +98,7 @@ TEST_CASES: list[dict[str, Any]] = resolve_env_placeholders(
         },
         "expected_status": 201,
         "setup": null,
-        "cleanup": {
-            "endpoint": "/api/products/{id}",
-            "method": "DELETE",
-            "path": {
-                "id": "$setup_id"
-            }
-        }
+        "cleanup": null
     },
     {
         "name": "create_product_minimal_fields",
@@ -122,20 +116,14 @@ TEST_CASES: list[dict[str, Any]] = resolve_env_placeholders(
         },
         "expected_status": 201,
         "setup": null,
-        "cleanup": {
-            "endpoint": "/api/products/{id}",
-            "method": "DELETE",
-            "path": {
-                "id": "$setup_id"
-            }
-        }
+        "cleanup": null
     },
     {
         "name": "create_product_missing_name",
         "category": "MISSING_REQUIRED",
         "endpoint": "/api/products",
         "method": "POST",
-        "description": "Attempt to create a product without name field, expect validation error",
+        "description": "Attempt to create a product without name field, expect 400 validation error",
         "request_data": {
             "path": {},
             "query": {},
@@ -143,7 +131,7 @@ TEST_CASES: list[dict[str, Any]] = resolve_env_placeholders(
                 "price": 15.0
             }
         },
-        "expected_status": 422,
+        "expected_status": 400,
         "setup": null,
         "cleanup": null
     },
@@ -152,7 +140,7 @@ TEST_CASES: list[dict[str, Any]] = resolve_env_placeholders(
         "category": "INVALID_INPUT",
         "endpoint": "/api/products",
         "method": "POST",
-        "description": "Attempt to create a product with price of zero, expect validation error since price must be greater than zero",
+        "description": "Attempt to create a product with price of zero, expect 400 since price must be greater than zero",
         "request_data": {
             "path": {},
             "query": {},
@@ -161,7 +149,7 @@ TEST_CASES: list[dict[str, Any]] = resolve_env_placeholders(
                 "price": 0
             }
         },
-        "expected_status": 422,
+        "expected_status": 400,
         "setup": null,
         "cleanup": null
     },
