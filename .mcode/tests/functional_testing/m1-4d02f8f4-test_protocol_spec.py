@@ -9,7 +9,7 @@ This script supports two modes:
 1. SRC Validation: Tests endpoints and captures responses (no expected_response)
 2. DST Contract Validation: Tests endpoints and validates responses match expected (has expected_response)
 
-Generated at: 2026-04-10T21:04:48.018129+00:00
+Generated at: 2026-04-10T21:10:11.673268+00:00
 Project: php-ecommerce
 Milestone: 1
 """
@@ -119,7 +119,7 @@ TEST_CASES: list[dict[str, Any]] = resolve_env_placeholders(
                 "description": "No name or price provided"
             }
         },
-        "expected_status": 422,
+        "expected_status": 400,
         "setup": null,
         "cleanup": null
     },
