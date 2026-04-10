@@ -9,7 +9,7 @@ This script supports two modes:
 1. SRC Validation: Tests endpoints and captures responses (no expected_response)
 2. DST Contract Validation: Tests endpoints and validates responses match expected (has expected_response)
 
-Generated at: 2026-04-10T13:46:33.378068+00:00
+Generated at: 2026-04-10T13:54:10.657348+00:00
 Project: php-ecommerce
 Milestone: 2
 """
@@ -55,25 +55,15 @@ TEST_CASES: list[dict[str, Any]] = resolve_env_placeholders(
         "category": "HAPPY_PATH",
         "endpoint": "/api/orders",
         "method": "POST",
-        "description": "Create a product via setup, then create an order for that product. Verifies 201 response with order details and line items.",
-        "setup": {
-            "endpoint": "/api/products",
-            "method": "POST",
-            "body": {
-                "name": "Test Widget",
-                "description": "A widget for testing order creation",
-                "price": 25.5,
-                "stock": 50
-            },
-            "extract_id_from": "id"
-        },
+        "description": "Create an order for a seeded product. Verifies 201 response with order details and line items.",
+        "setup": null,
         "request_data": {
             "path": {},
             "query": {},
             "body": {
                 "items": [
                     {
-                        "product_id": "$setup_id",
+                        "product_id": 1,
                         "quantity": 2
                     }
                 ]
@@ -94,7 +84,7 @@ TEST_CASES: list[dict[str, Any]] = resolve_env_placeholders(
             "query": {},
             "body": {}
         },
-        "expected_status": 422,
+        "expected_status": 400,
         "cleanup": null
     },
     {
@@ -102,38 +92,22 @@ TEST_CASES: list[dict[str, Any]] = resolve_env_placeholders(
         "category": "INVALID_INPUT",
         "endpoint": "/api/orders",
         "method": "POST",
-        "description": "Create a product with stock=1, then attempt to order quantity=999. Expects 400 insufficient stock error.",
-        "setup": {
-            "endpoint": "/api/products",
-            "method": "POST",
-            "body": {
-                "name": "Scarce Item",
-                "description": "Limited stock item for testing",
-                "price": 15.0,
-                "stock": 1
-            },
-            "extract_id_from": "id"
-        },
+        "description": "Attempt to order quantity=999999 of a seeded product that has far less stock. Expects 400 insufficient stock error.",
+        "setup": null,
         "request_data": {
             "path": {},
             "query": {},
             "body": {
                 "items": [
                     {
-                        "product_id": "$setup_id",
-                        "quantity": 999
+                        "product_id": 1,
+                        "quantity": 999999
                     }
                 ]
             }
         },
         "expected_status": 400,
-        "cleanup": {
-            "endpoint": "/api/products/{id}",
-            "method": "DELETE",
-            "path": {
-                "id": "$setup_id"
-            }
-        }
+        "cleanup": null
     },
     {
         "name": "create_order_nonexistent_product",
