@@ -9,7 +9,7 @@ This script supports two modes:
 1. SRC Validation: Tests endpoints and captures responses (no expected_response)
 2. DST Contract Validation: Tests endpoints and validates responses match expected (has expected_response)
 
-Generated at: 2026-04-10T21:12:42.508507+00:00
+Generated at: 2026-04-10T21:16:23.945720+00:00
 Project: php-ecommerce
 Milestone: 4
 """
@@ -384,25 +384,15 @@ TEST_CASES: list[dict[str, Any]] = resolve_env_placeholders(
         "category": "HAPPY_PATH",
         "endpoint": "/api/orders",
         "method": "POST",
-        "description": "Create a product with stock, then create an order for that product. Verifies the full order creation pipeline including stock decrement and RabbitMQ event publishing.",
-        "setup": {
-            "endpoint": "/api/products",
-            "method": "POST",
-            "body": {
-                "name": "Orderable Product",
-                "description": "Product for order creation test",
-                "price": 35.0,
-                "stock": 100
-            },
-            "extract_id_from": "id"
-        },
+        "description": "Create an order for seeded product 3 (USB-C Hub, stock 200). Verifies the full order creation pipeline including stock decrement and RabbitMQ event publishing.",
+        "setup": null,
         "request_data": {
             "path": {},
             "query": {},
             "body": {
                 "items": [
                     {
-                        "product_id": "$setup_id",
+                        "product_id": 3,
                         "quantity": 2
                     }
                 ]
@@ -470,26 +460,16 @@ TEST_CASES: list[dict[str, Any]] = resolve_env_placeholders(
         "category": "INVALID_INPUT",
         "endpoint": "/api/orders",
         "method": "POST",
-        "description": "Create a product with limited stock, then attempt to order more than available",
-        "setup": {
-            "endpoint": "/api/products",
-            "method": "POST",
-            "body": {
-                "name": "Low Stock Product",
-                "description": "Only 2 in stock",
-                "price": 50.0,
-                "stock": 2
-            },
-            "extract_id_from": "id"
-        },
+        "description": "Attempt to order more units of seeded product 5 (Webcam HD, stock 60) than available",
+        "setup": null,
         "request_data": {
             "path": {},
             "query": {},
             "body": {
                 "items": [
                     {
-                        "product_id": "$setup_id",
-                        "quantity": 100
+                        "product_id": 5,
+                        "quantity": 1000
                     }
                 ]
             }
