@@ -9,7 +9,7 @@ This script supports two modes:
 1. SRC Validation: Tests endpoints and captures responses (no expected_response)
 2. DST Contract Validation: Tests endpoints and validates responses match expected (has expected_response)
 
-Generated at: 2026-04-12T05:33:51.595142+00:00
+Generated at: 2026-04-12T05:37:47.571654+00:00
 Project: php-ecommerce
 Milestone: 2
 """
@@ -372,7 +372,7 @@ TEST_CASES: list[dict[str, Any]] = resolve_env_placeholders(
             "body": {
                 "items": [
                     {
-                        "product_id": "$setup_id",
+                        "product_id": 1,
                         "quantity": 2
                     }
                 ]
@@ -440,31 +440,21 @@ TEST_CASES: list[dict[str, Any]] = resolve_env_placeholders(
         "category": "INVALID_INPUT",
         "endpoint": "/api/orders",
         "method": "POST",
-        "description": "Create a product with low stock, then attempt to order more than available, expect 400",
-        "setup": {
-            "endpoint": "/api/products",
-            "method": "POST",
-            "body": {
-                "name": "Low Stock Product",
-                "description": "Only 2 in stock",
-                "price": 15.0,
-                "stock": 2
-            },
-            "extract_id_from": "id"
-        },
+        "description": "Attempt to order more than available stock for seed product, expect 400",
         "request_data": {
             "path": {},
             "query": {},
             "body": {
                 "items": [
                     {
-                        "product_id": "$setup_id",
-                        "quantity": 50
+                        "product_id": 1,
+                        "quantity": 999999
                     }
                 ]
             }
         },
         "expected_status": 400,
+        "setup": null,
         "cleanup": null
     },
     {
