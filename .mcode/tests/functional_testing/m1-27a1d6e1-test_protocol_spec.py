@@ -9,7 +9,7 @@ This script supports two modes:
 1. SRC Validation: Tests endpoints and captures responses (no expected_response)
 2. DST Contract Validation: Tests endpoints and validates responses match expected (has expected_response)
 
-Generated at: 2026-04-12T14:22:14.062153+00:00
+Generated at: 2026-04-12T14:23:49.085788+00:00
 Project: php-ecommerce
 Milestone: 1
 """
@@ -111,7 +111,7 @@ TEST_CASES: list[dict[str, Any]] = resolve_env_placeholders(
         "category": "MISSING_REQUIRED",
         "endpoint": "/api/products",
         "method": "POST",
-        "description": "Attempt to create a product without name and price, expect 422 validation error",
+        "description": "Attempt to create a product without name and price, expect 400 validation error",
         "request_data": {
             "path": {},
             "query": {},
@@ -119,7 +119,7 @@ TEST_CASES: list[dict[str, Any]] = resolve_env_placeholders(
                 "description": "Missing name and price"
             }
         },
-        "expected_status": 422,
+        "expected_status": 400,
         "setup": null,
         "cleanup": null
     },
@@ -128,7 +128,7 @@ TEST_CASES: list[dict[str, Any]] = resolve_env_placeholders(
         "category": "INVALID_INPUT",
         "endpoint": "/api/products",
         "method": "POST",
-        "description": "Attempt to create a product with zero price, expect 400 or 422 error",
+        "description": "Attempt to create a product with zero price, expect 400 error",
         "request_data": {
             "path": {},
             "query": {},
@@ -137,7 +137,7 @@ TEST_CASES: list[dict[str, Any]] = resolve_env_placeholders(
                 "price": 0
             }
         },
-        "expected_status": 422,
+        "expected_status": 400,
         "setup": null,
         "cleanup": null
     },
@@ -146,7 +146,7 @@ TEST_CASES: list[dict[str, Any]] = resolve_env_placeholders(
         "category": "INVALID_INPUT",
         "endpoint": "/api/products",
         "method": "POST",
-        "description": "Attempt to create a product with negative stock, expect 400 or 422 error",
+        "description": "Attempt to create a product with negative stock, expect 400 error",
         "request_data": {
             "path": {},
             "query": {},
@@ -156,7 +156,7 @@ TEST_CASES: list[dict[str, Any]] = resolve_env_placeholders(
                 "stock": -5
             }
         },
-        "expected_status": 422,
+        "expected_status": 400,
         "setup": null,
         "cleanup": null
     },
