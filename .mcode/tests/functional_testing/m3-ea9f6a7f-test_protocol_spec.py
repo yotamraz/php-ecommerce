@@ -9,7 +9,7 @@ This script supports two modes:
 1. SRC Validation: Tests endpoints and captures responses (no expected_response)
 2. DST Contract Validation: Tests endpoints and validates responses match expected (has expected_response)
 
-Generated at: 2026-04-12T05:40:18.478211+00:00
+Generated at: 2026-04-12T05:43:58.180451+00:00
 Project: php-ecommerce
 Milestone: 3
 """
@@ -358,24 +358,15 @@ TEST_CASES: list[dict[str, Any]] = resolve_env_placeholders(
         "category": "HAPPY_PATH",
         "endpoint": "/api/orders",
         "method": "POST",
-        "description": "Create a product with stock, then create an order for it. Verifies order creation with stock decrement and RabbitMQ event publishing.",
-        "setup": {
-            "endpoint": "/api/products",
-            "method": "POST",
-            "body": {
-                "name": "Orderable Product",
-                "price": 29.99,
-                "stock": 100
-            },
-            "extract_id_from": "id"
-        },
+        "description": "Create an order using a seeded product. Verifies order creation with stock decrement and RabbitMQ event publishing.",
+        "setup": null,
         "request_data": {
             "path": {},
             "query": {},
             "body": {
                 "items": [
                     {
-                        "product_id": "$setup_id",
+                        "product_id": 1,
                         "quantity": 2
                     }
                 ]
@@ -443,25 +434,16 @@ TEST_CASES: list[dict[str, Any]] = resolve_env_placeholders(
         "category": "INVALID_INPUT",
         "endpoint": "/api/orders",
         "method": "POST",
-        "description": "Create a product with low stock and attempt to order more than available, expect 400",
-        "setup": {
-            "endpoint": "/api/products",
-            "method": "POST",
-            "body": {
-                "name": "Low Stock Product",
-                "price": 15.0,
-                "stock": 2
-            },
-            "extract_id_from": "id"
-        },
+        "description": "Attempt to order more than available stock for a seeded product, expect 400",
+        "setup": null,
         "request_data": {
             "path": {},
             "query": {},
             "body": {
                 "items": [
                     {
-                        "product_id": "$setup_id",
-                        "quantity": 100
+                        "product_id": 2,
+                        "quantity": 999999
                     }
                 ]
             }
@@ -474,14 +456,17 @@ TEST_CASES: list[dict[str, Any]] = resolve_env_placeholders(
         "category": "HAPPY_PATH",
         "endpoint": "/api/orders/{id}",
         "method": "GET",
-        "description": "Create a product, place an order, then retrieve the order by ID with items",
+        "description": "Create an order using a seeded product, then retrieve the order by ID",
         "setup": {
-            "endpoint": "/api/products",
+            "endpoint": "/api/orders",
             "method": "POST",
             "body": {
-                "name": "Order Fetch Product",
-                "price": 45.0,
-                "stock": 50
+                "items": [
+                    {
+                        "product_id": 3,
+                        "quantity": 1
+                    }
+                ]
             },
             "extract_id_from": "id"
         },
