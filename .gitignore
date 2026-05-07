@@ -3,6 +3,9 @@ src/composer.lock
 .env
 .DS_Store
 
+# PHPUnit cache
+src/.phpunit.cache/
+
 # Python test artifacts
 .venv/
 venv/
