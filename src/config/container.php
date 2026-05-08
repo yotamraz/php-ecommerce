@@ -1,0 +1,53 @@
+<?php
+
+declare(strict_types=1);
+
+use App\Config\Config;
+use App\Repositories\ProductRepository;
+use App\Services\ProductService;
+use DI\ContainerBuilder;
+use Predis\Client as RedisClient;
+use PhpAmqpLib\Connection\AMQPStreamConnection;
+use Psr\Container\ContainerInterface;
+
+return static function (ContainerBuilder $containerBuilder): void {
+    $containerBuilder->addDefinitions([
+        // Configuration
+        Config::class => \DI\create(Config::class),
+
+        // Database (PDO) — will be replaced by Doctrine DBAL in milestone 3
+        PDO::class => static function (ContainerInterface $c): PDO {
+            $config = $c->get(Config::class);
+            return new PDO(
+                $config->getDsn(),
+                $config->dbUser,
+                $config->dbPass,
+                [
+                    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                ]
+            );
+        },
+
+        // Redis cache
+        RedisClient::class => static function (ContainerInterface $c): RedisClient {
+            $config = $c->get(Config::class);
+            return new RedisClient([
+                'scheme' => 'tcp',
+                'host' => $config->redisHost,
+                'port' => $config->redisPort,
+            ]);
+        },
+
+        // RabbitMQ connection
+        AMQPStreamConnection::class => static function (ContainerInterface $c): AMQPStreamConnection {
+            $config = $c->get(Config::class);
+            return new AMQPStreamConnection(
+                $config->rabbitmqHost,
+                $config->rabbitmqPort,
+                $config->rabbitmqUser,
+                $config->rabbitmqPass,
+            );
+        },
+    ]);
+};

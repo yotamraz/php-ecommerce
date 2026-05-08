@@ -2,3 +2,14 @@ src/vendor/
 src/composer.lock
 .env
 .DS_Store
+
+# Python test artifacts
+.venv/
+venv/
+__pycache__/
+.pytest_cache/
+*.pyc
+*.pyo
+
+# PHPUnit
+src/.phpunit.cache/
