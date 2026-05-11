@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Exceptions\ValidationException;
 use App\Repositories\ProductRepository;
 use Predis\Client as RedisClient;
 use Respect\Validation\Validator as v;
-use Respect\Validation\Exceptions\NestedValidationException;
 
 /**
  * Business logic for product operations.
@@ -132,22 +132,38 @@ class ProductService
 
     /**
      * Validate input data for product creation using Respect/Validation.
+     *
+     * Uses Respect/Validation's declarative validators via validate() for
+     * field-level checks, with backward-compatible error messages.
      */
     private function validateCreateData(array $data): void
     {
-        // Check required fields exist
-        if (!isset($data['name'], $data['price'])) {
-            throw new \InvalidArgumentException('name and price are required');
+        $errors = [];
+
+        // Required fields check via Respect/Validation
+        if (!v::key('name', v::stringType()->notEmpty())->validate($data)) {
+            $errors['name'] = 'name is required';
+        }
+        if (!v::key('price', v::notEmpty())->validate($data)) {
+            $errors['price'] = 'price is required';
         }
 
-        // Validate price is positive
-        if ((float) $data['price'] <= 0) {
-            throw new \InvalidArgumentException('price must be greater than zero');
+        if (!empty($errors)) {
+            throw new ValidationException('name and price are required', $errors);
         }
 
-        // Validate stock if provided
-        if (isset($data['stock']) && (int) $data['stock'] < 0) {
-            throw new \InvalidArgumentException('stock cannot be negative');
+        // Price must be positive
+        if (!v::floatVal()->positive()->validate($data['price'])) {
+            throw new ValidationException('price must be greater than zero', [
+                'price' => 'price must be greater than zero',
+            ]);
+        }
+
+        // Stock cannot be negative (optional field)
+        if (isset($data['stock']) && !v::intVal()->min(0)->validate($data['stock'])) {
+            throw new ValidationException('stock cannot be negative', [
+                'stock' => 'stock cannot be negative',
+            ]);
         }
     }
 

@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Exceptions\ValidationException;
 use App\Repositories\OrderRepository;
 use App\Repositories\ProductRepository;
 use Predis\Client as RedisClient;
+use Respect\Validation\Validator as v;
 
 /**
  * Business logic for order operations.
@@ -129,23 +131,35 @@ class OrderService
     }
 
     /**
-     * Validate the incoming order data.
+     * Validate the incoming order data using Respect/Validation.
+     *
+     * Uses backward-compatible exception messages for simple structural
+     * checks, and declarative Respect/Validation for item field rules.
      *
      * @throws \InvalidArgumentException On invalid input
      */
     private function validateOrderData(array $data): void
     {
-        if (!isset($data['items']) || !is_array($data['items']) || empty($data['items'])) {
-            throw new \InvalidArgumentException('items array is required');
+        // Validate items array exists and is non-empty
+        if (!v::key('items', v::arrayType()->notEmpty())->validate($data)) {
+            throw new ValidationException('items array is required', [
+                'items' => 'items array is required',
+            ]);
         }
 
         foreach ($data['items'] as $index => $item) {
-            if (!isset($item['product_id'], $item['quantity'])) {
-                throw new \InvalidArgumentException('Each item needs product_id and quantity');
+            // Each item must have product_id and quantity
+            if (!v::key('product_id', v::notOptional())->key('quantity', v::notOptional())->validate($item)) {
+                throw new ValidationException('Each item needs product_id and quantity', [
+                    "items[{$index}]" => 'product_id and quantity are required',
+                ]);
             }
 
-            if ((int) $item['quantity'] < 1) {
-                throw new \InvalidArgumentException('Quantity must be at least 1');
+            // Quantity must be at least 1
+            if (!v::intVal()->min(1)->validate($item['quantity'])) {
+                throw new ValidationException('Quantity must be at least 1', [
+                    "items[{$index}].quantity" => 'Quantity must be at least 1',
+                ]);
             }
         }
     }
