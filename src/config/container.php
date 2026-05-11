@@ -3,7 +3,10 @@
 declare(strict_types=1);
 
 use App\Config\Config;
+use App\Repositories\OrderRepository;
 use App\Repositories\ProductRepository;
+use App\Services\EventPublisher;
+use App\Services\OrderService;
 use App\Services\ProductService;
 use DI\ContainerBuilder;
 use Predis\Client as RedisClient;
@@ -47,6 +50,37 @@ return static function (ContainerBuilder $containerBuilder): void {
                 $config->rabbitmqPort,
                 $config->rabbitmqUser,
                 $config->rabbitmqPass,
+            );
+        },
+
+        // Event publisher (wraps RabbitMQ)
+        EventPublisher::class => static function (ContainerInterface $c): EventPublisher {
+            return new EventPublisher($c->get(AMQPStreamConnection::class));
+        },
+
+        // Repositories
+        ProductRepository::class => static function (ContainerInterface $c): ProductRepository {
+            return new ProductRepository($c->get(PDO::class));
+        },
+
+        OrderRepository::class => static function (ContainerInterface $c): OrderRepository {
+            return new OrderRepository($c->get(PDO::class));
+        },
+
+        // Services
+        ProductService::class => static function (ContainerInterface $c): ProductService {
+            return new ProductService(
+                $c->get(ProductRepository::class),
+                $c->get(RedisClient::class),
+            );
+        },
+
+        OrderService::class => static function (ContainerInterface $c): OrderService {
+            return new OrderService(
+                $c->get(OrderRepository::class),
+                $c->get(ProductRepository::class),
+                $c->get(RedisClient::class),
+                $c->get(EventPublisher::class),
             );
         },
     ]);
