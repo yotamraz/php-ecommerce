@@ -7,7 +7,7 @@ services:
       MYSQL_USER: ecommerce
       MYSQL_PASSWORD: ecommerce
     ports:
-      - "3307:3306"
+      - "13306:3306"
     volumes:
       - m2_mysql_data:/var/lib/mysql
       - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
@@ -20,7 +20,7 @@ services:
   redis:
     image: redis:7-alpine
     ports:
-      - "6380:6379"
+      - "16379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -33,8 +33,8 @@ services:
       RABBITMQ_DEFAULT_USER: guest
       RABBITMQ_DEFAULT_PASS: guest
     ports:
-      - "5673:5672"
-      - "15673:15672"
+      - "15672:5672"
+      - "25672:15672"
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 10s
