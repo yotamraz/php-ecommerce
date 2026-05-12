@@ -88,4 +88,28 @@ class ProductRepository
         $stmt->execute([$id]);
         return (bool) $stmt->fetch();
     }
+
+    /**
+     * Fetch a product with a row-level lock (SELECT ... FOR UPDATE).
+     * Must be called within an active transaction.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function findByIdForUpdate(int $id): ?array
+    {
+        $stmt = $this->db->prepare('SELECT * FROM products WHERE id = ? FOR UPDATE');
+        $stmt->execute([$id]);
+        $row = $stmt->fetch();
+        return $row ?: null;
+    }
+
+    /**
+     * Decrement product stock by the given quantity.
+     * Must be called within an active transaction after findByIdForUpdate().
+     */
+    public function decrementStock(int $id, int $quantity): void
+    {
+        $stmt = $this->db->prepare('UPDATE products SET stock = stock - ? WHERE id = ?');
+        $stmt->execute([$quantity, $id]);
+    }
 }
