@@ -6,6 +6,8 @@ namespace App\Services;
 
 use App\Repositories\OrderRepository;
 use Predis\Client as RedisClient;
+use Respect\Validation\Validator as v;
+use Respect\Validation\Exceptions\NestedValidationException;
 
 /**
  * Business logic for order operations.
@@ -136,7 +138,7 @@ class OrderService
     }
 
     /**
-     * Validate order creation input data.
+     * Validate order creation input data using Respect/Validation.
      *
      * @param array<string, mixed> $data
      */
@@ -159,7 +161,10 @@ class OrderService
                 throw new \InvalidArgumentException("item {$index}: quantity is required");
             }
 
-            if ((int) $item['quantity'] <= 0) {
+            // Validate quantity using Respect/Validation
+            try {
+                v::intVal()->positive()->assert($item['quantity']);
+            } catch (NestedValidationException) {
                 throw new \InvalidArgumentException("item {$index}: quantity must be greater than zero");
             }
         }

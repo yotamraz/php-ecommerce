@@ -132,22 +132,32 @@ class ProductService
 
     /**
      * Validate input data for product creation using Respect/Validation.
+     *
+     * Uses Respect/Validation rules for structured validation while
+     * preserving backward-compatible error messages.
      */
     private function validateCreateData(array $data): void
     {
-        // Check required fields exist
-        if (!isset($data['name'], $data['price'])) {
+        // Check required fields exist using PHP 8.4 array_any
+        $requiredFields = ['name', 'price'];
+        if (array_any($requiredFields, fn(string $key) => !isset($data[$key]))) {
             throw new \InvalidArgumentException('name and price are required');
         }
 
-        // Validate price is positive
-        if ((float) $data['price'] <= 0) {
+        // Validate price using Respect/Validation
+        try {
+            v::floatVal()->positive()->assert($data['price']);
+        } catch (NestedValidationException) {
             throw new \InvalidArgumentException('price must be greater than zero');
         }
 
-        // Validate stock if provided
-        if (isset($data['stock']) && (int) $data['stock'] < 0) {
-            throw new \InvalidArgumentException('stock cannot be negative');
+        // Validate stock if provided using Respect/Validation
+        if (isset($data['stock'])) {
+            try {
+                v::intVal()->min(0)->assert($data['stock']);
+            } catch (NestedValidationException) {
+                throw new \InvalidArgumentException('stock cannot be negative');
+            }
         }
     }
 
