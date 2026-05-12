@@ -26,6 +26,7 @@ $container = $containerBuilder->build();
 $app = AppFactory::createFromContainer($container);
 
 // Add middleware (LIFO order — last added runs first)
+$app->addBodyParsingMiddleware(); // Parses JSON, form data, XML request bodies
 $app->addRoutingMiddleware();
 $app->add(new JsonResponseMiddleware());
 $app->add(new ErrorHandlerMiddleware());
