@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Repositories\OrderRepository;
 use Predis\Client as RedisClient;
+use Respect\Validation\Validator as v;
 
 /**
  * Business logic for order operations.
@@ -123,29 +124,29 @@ class OrderService
     }
 
     /**
-     * Validate the top-level order data structure.
+     * Validate the top-level order data structure using Respect/Validation.
      *
      * @throws \InvalidArgumentException
      */
     private function validateOrderData(array $data): void
     {
-        if (!isset($data['items']) || !is_array($data['items']) || empty($data['items'])) {
+        if (!v::key('items', v::arrayType()->notEmpty())->validate($data)) {
             throw new \InvalidArgumentException('items array is required');
         }
     }
 
     /**
-     * Validate a single order item.
+     * Validate a single order item using Respect/Validation.
      *
      * @throws \InvalidArgumentException
      */
     private function validateOrderItem(array $item): void
     {
-        if (!isset($item['product_id'], $item['quantity'])) {
+        if (!v::key('product_id', v::notEmpty())->key('quantity', v::notEmpty())->validate($item)) {
             throw new \InvalidArgumentException('Each item needs product_id and quantity');
         }
 
-        if ((int) $item['quantity'] < 1) {
+        if (!v::intVal()->min(1)->validate($item['quantity'])) {
             throw new \InvalidArgumentException('Quantity must be at least 1');
         }
     }

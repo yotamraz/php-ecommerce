@@ -132,21 +132,24 @@ class ProductService
 
     /**
      * Validate input data for product creation using Respect/Validation.
+     *
+     * Uses Respect/Validation for rule checking while preserving
+     * backward-compatible error messages.
      */
     private function validateCreateData(array $data): void
     {
         // Check required fields exist
-        if (!isset($data['name'], $data['price'])) {
+        if (!v::key('name', v::notEmpty())->key('price', v::notEmpty())->validate($data)) {
             throw new \InvalidArgumentException('name and price are required');
         }
 
         // Validate price is positive
-        if ((float) $data['price'] <= 0) {
+        if (!v::floatVal()->positive()->validate($data['price'])) {
             throw new \InvalidArgumentException('price must be greater than zero');
         }
 
         // Validate stock if provided
-        if (isset($data['stock']) && (int) $data['stock'] < 0) {
+        if (array_key_exists('stock', $data) && !v::intVal()->min(0)->validate($data['stock'])) {
             throw new \InvalidArgumentException('stock cannot be negative');
         }
     }
