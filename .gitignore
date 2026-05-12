@@ -13,3 +13,6 @@ __pycache__/
 
 # PHPUnit
 src/.phpunit.cache/
+
+# Model daemon test scripts
+.mcode/
