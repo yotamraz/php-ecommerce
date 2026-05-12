@@ -20,30 +20,38 @@ class ErrorHandlerMiddleware implements MiddlewareInterface
         try {
             return $handler->handle($request);
         } catch (\Respect\Validation\Exceptions\NestedValidationException $e) {
-            $response = new Response();
-            $response->getBody()->write(json_encode([
+            return $this->jsonResponse(400, [
                 'error' => 'Validation failed',
                 'details' => $e->getMessages(),
-            ]));
-            return $response
-                ->withStatus(400)
-                ->withHeader('Content-Type', 'application/json');
+            ]);
         } catch (\InvalidArgumentException $e) {
-            $response = new Response();
-            $response->getBody()->write(json_encode([
+            return $this->jsonResponse(400, [
                 'error' => $e->getMessage(),
-            ]));
-            return $response
-                ->withStatus(400)
-                ->withHeader('Content-Type', 'application/json');
+            ]);
+        } catch (\RuntimeException $e) {
+            $code = $e->getCode();
+            // Use exception code as HTTP status if it's a valid 4xx code
+            $status = ($code >= 400 && $code < 500) ? $code : 500;
+            $message = $status < 500 ? $e->getMessage() : 'Internal server error';
+            return $this->jsonResponse($status, [
+                'error' => $message,
+            ]);
         } catch (\Throwable $e) {
-            $response = new Response();
-            $response->getBody()->write(json_encode([
+            return $this->jsonResponse(500, [
                 'error' => 'Internal server error',
-            ]));
-            return $response
-                ->withStatus(500)
-                ->withHeader('Content-Type', 'application/json');
+            ]);
         }
+    }
+
+    /**
+     * Build a JSON error response.
+     */
+    private function jsonResponse(int $status, array $body): ResponseInterface
+    {
+        $response = new Response();
+        $response->getBody()->write(json_encode($body));
+        return $response
+            ->withStatus($status)
+            ->withHeader('Content-Type', 'application/json');
     }
 }
