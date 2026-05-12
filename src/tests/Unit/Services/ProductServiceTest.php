@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services;
 
+use App\Exceptions\ValidationException;
 use App\Repositories\ProductRepository;
 use App\Services\ProductService;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -71,7 +72,7 @@ class ProductServiceTest extends TestCase
 
     public function testCreateProductValidatesRequiredFields(): void
     {
-        $this->expectException(\InvalidArgumentException::class);
+        $this->expectException(ValidationException::class);
         $this->expectExceptionMessage('name and price are required');
 
         $this->service->createProduct([]);
@@ -79,7 +80,7 @@ class ProductServiceTest extends TestCase
 
     public function testCreateProductValidatesPricePositive(): void
     {
-        $this->expectException(\InvalidArgumentException::class);
+        $this->expectException(ValidationException::class);
         $this->expectExceptionMessage('price must be greater than zero');
 
         $this->service->createProduct(['name' => 'Test', 'price' => -5]);
@@ -87,10 +88,22 @@ class ProductServiceTest extends TestCase
 
     public function testCreateProductValidatesStockNonNegative(): void
     {
-        $this->expectException(\InvalidArgumentException::class);
+        $this->expectException(ValidationException::class);
         $this->expectExceptionMessage('stock cannot be negative');
 
         $this->service->createProduct(['name' => 'Test', 'price' => 10, 'stock' => -1]);
+    }
+
+    public function testCreateProductValidationExceptionHasDetails(): void
+    {
+        try {
+            $this->service->createProduct([]);
+            $this->fail('Expected ValidationException');
+        } catch (ValidationException $e) {
+            $details = $e->getDetails();
+            $this->assertArrayHasKey('name', $details);
+            $this->assertArrayHasKey('price', $details);
+        }
     }
 
     public function testCreateProductSuccess(): void
