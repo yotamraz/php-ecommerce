@@ -39,15 +39,20 @@ return static function (ContainerBuilder $containerBuilder): void {
             ]);
         },
 
-        // RabbitMQ connection
-        AMQPStreamConnection::class => static function (ContainerInterface $c): AMQPStreamConnection {
+        // RabbitMQ connection — nullable to gracefully handle connectivity failures
+        AMQPStreamConnection::class => static function (ContainerInterface $c): ?AMQPStreamConnection {
             $config = $c->get(Config::class);
-            return new AMQPStreamConnection(
-                $config->rabbitmqHost,
-                $config->rabbitmqPort,
-                $config->rabbitmqUser,
-                $config->rabbitmqPass,
-            );
+            try {
+                return new AMQPStreamConnection(
+                    $config->rabbitmqHost,
+                    $config->rabbitmqPort,
+                    $config->rabbitmqUser,
+                    $config->rabbitmqPass,
+                );
+            } catch (\Exception $e) {
+                // Connection will be retried on next container resolution
+                return null;
+            }
         },
     ]);
 };

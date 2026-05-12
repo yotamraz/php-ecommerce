@@ -14,7 +14,7 @@ use PhpAmqpLib\Message\AMQPMessage;
 class EventPublisher
 {
     public function __construct(
-        private AMQPStreamConnection $connection,
+        private ?AMQPStreamConnection $connection,
     ) {}
 
     /**
@@ -25,6 +25,11 @@ class EventPublisher
      */
     public function publish(string $queueName, array $data): void
     {
+        if ($this->connection === null) {
+            // RabbitMQ not available — skip publishing silently
+            return;
+        }
+
         $channel = $this->connection->channel();
         $channel->queue_declare($queueName, false, true, false, false);
 
