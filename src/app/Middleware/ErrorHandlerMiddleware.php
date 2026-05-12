@@ -36,6 +36,16 @@ class ErrorHandlerMiddleware implements MiddlewareInterface
             return $response
                 ->withStatus(400)
                 ->withHeader('Content-Type', 'application/json');
+        } catch (\RuntimeException $e) {
+            $code = $e->getCode();
+            $status = in_array($code, [400, 404, 409], true) ? $code : 500;
+            $response = new Response();
+            $response->getBody()->write(json_encode([
+                'error' => $e->getMessage(),
+            ]));
+            return $response
+                ->withStatus($status)
+                ->withHeader('Content-Type', 'application/json');
         } catch (\Throwable $e) {
             $response = new Response();
             $response->getBody()->write(json_encode([
