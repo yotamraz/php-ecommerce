@@ -5,35 +5,17 @@ declare(strict_types=1);
 namespace App\Entities;
 
 /**
- * Product entity using PHP 8.4 property hooks and asymmetric visibility.
+ * Product entity using PHP 8.2 readonly properties.
  */
 class Product
 {
-    public private(set) int $id;
-    public private(set) string $name;
-    public private(set) string $description;
-    public private(set) string $createdAt;
-    public private(set) string $updatedAt;
-
-    /** Price with validation hook — must be positive */
-    public private(set) float $price {
-        set(float $value) {
-            if ($value <= 0) {
-                throw new \InvalidArgumentException('price must be greater than zero');
-            }
-            $this->price = $value;
-        }
-    }
-
-    /** Stock with validation hook — cannot be negative */
-    public private(set) int $stock {
-        set(int $value) {
-            if ($value < 0) {
-                throw new \InvalidArgumentException('stock cannot be negative');
-            }
-            $this->stock = $value;
-        }
-    }
+    public readonly int $id;
+    public readonly string $name;
+    public readonly string $description;
+    public readonly string $createdAt;
+    public readonly string $updatedAt;
+    public readonly float $price;
+    public readonly int $stock;
 
     public function __construct(
         int $id,
@@ -44,6 +26,13 @@ class Product
         string $createdAt = '',
         string $updatedAt = '',
     ) {
+        if ($price <= 0) {
+            throw new \InvalidArgumentException('price must be greater than zero');
+        }
+        if ($stock < 0) {
+            throw new \InvalidArgumentException('stock cannot be negative');
+        }
+
         $this->id = $id;
         $this->name = $name;
         $this->description = $description;
