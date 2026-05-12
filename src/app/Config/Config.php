@@ -8,26 +8,26 @@ use RuntimeException;
 
 /**
  * Typed configuration class that validates all required environment variables at boot.
- * Uses PHP 8.4 asymmetric visibility for read-only public access.
+ * Uses readonly properties for immutability after construction.
  */
 class Config
 {
     // Database
-    public private(set) string $dbHost;
-    public private(set) string $dbName;
-    public private(set) string $dbUser;
-    public private(set) string $dbPass;
-    public private(set) int $dbPort;
+    public readonly string $dbHost;
+    public readonly string $dbName;
+    public readonly string $dbUser;
+    public readonly string $dbPass;
+    public readonly int $dbPort;
 
     // Redis
-    public private(set) string $redisHost;
-    public private(set) int $redisPort;
+    public readonly string $redisHost;
+    public readonly int $redisPort;
 
     // RabbitMQ
-    public private(set) string $rabbitmqHost;
-    public private(set) int $rabbitmqPort;
-    public private(set) string $rabbitmqUser;
-    public private(set) string $rabbitmqPass;
+    public readonly string $rabbitmqHost;
+    public readonly int $rabbitmqPort;
+    public readonly string $rabbitmqUser;
+    public readonly string $rabbitmqPass;
 
     public function __construct()
     {

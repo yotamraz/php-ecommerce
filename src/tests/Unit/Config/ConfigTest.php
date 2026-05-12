@@ -57,15 +57,16 @@ class ConfigTest extends TestCase
         $this->assertStringContainsString('charset=utf8mb4', $dsn);
     }
 
-    public function testAsymmetricVisibilityPreventsWrite(): void
+    public function testReadonlyPreventsWrite(): void
     {
         $config = new Config();
 
         // Verify properties are publicly readable
         $this->assertIsString($config->dbHost);
 
-        // Verify that private(set) prevents external mutation via reflection
+        // Verify that readonly prevents external mutation
         $reflection = new \ReflectionProperty(Config::class, 'dbHost');
         $this->assertTrue($reflection->isPublic());
+        $this->assertTrue($reflection->isReadOnly());
     }
 }
