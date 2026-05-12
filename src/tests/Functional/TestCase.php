@@ -38,6 +38,7 @@ abstract class TestCase extends PHPUnitTestCase
         $app = AppFactory::createFromContainer($container);
 
         // Add middleware in same order as production
+        $app->addBodyParsingMiddleware();
         $app->addRoutingMiddleware();
         $app->add(new JsonResponseMiddleware());
         $app->add(new ErrorHandlerMiddleware());
