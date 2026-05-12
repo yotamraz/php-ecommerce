@@ -7,6 +7,8 @@ namespace App\Services;
 use App\Repositories\OrderRepository;
 use App\Repositories\ProductRepository;
 use Predis\Client as RedisClient;
+use Respect\Validation\Validator as v;
+use Respect\Validation\Exceptions\NestedValidationException;
 
 /**
  * Business logic for order operations.
@@ -146,7 +148,7 @@ class OrderService
     }
 
     /**
-     * Validate order input data.
+     * Validate order input data using Respect/Validation.
      *
      * @throws \InvalidArgumentException On invalid input
      */
@@ -157,20 +159,24 @@ class OrderService
         }
 
         foreach ($data['items'] as $index => $item) {
-            if (!isset($item['product_id'])) {
-                throw new \InvalidArgumentException("items[{$index}].product_id is required");
+            if (!is_array($item)) {
+                throw new \InvalidArgumentException("items[{$index}] must be an object");
             }
 
-            if (!is_numeric($item['product_id']) || (int) $item['product_id'] <= 0) {
-                throw new \InvalidArgumentException("items[{$index}].product_id must be a positive integer");
-            }
-
-            if (!isset($item['quantity'])) {
-                throw new \InvalidArgumentException("items[{$index}].quantity is required");
-            }
-
-            if (!is_numeric($item['quantity']) || (int) $item['quantity'] <= 0) {
-                throw new \InvalidArgumentException("items[{$index}].quantity must be a positive integer");
+            try {
+                v::key('product_id', v::intVal()->positive())
+                    ->key('quantity', v::intVal()->positive())
+                    ->assert($item);
+            } catch (NestedValidationException $e) {
+                $messages = $e->getMessages();
+                $firstMessage = reset($messages);
+                if (!isset($item['product_id'])) {
+                    throw new \InvalidArgumentException("items[{$index}].product_id is required");
+                }
+                if (!isset($item['quantity'])) {
+                    throw new \InvalidArgumentException("items[{$index}].quantity is required");
+                }
+                throw new \InvalidArgumentException("items[{$index}]: {$firstMessage}");
             }
         }
     }

@@ -135,19 +135,25 @@ class ProductService
      */
     private function validateCreateData(array $data): void
     {
-        // Check required fields exist
         if (!isset($data['name'], $data['price'])) {
             throw new \InvalidArgumentException('name and price are required');
         }
 
-        // Validate price is positive
-        if ((float) $data['price'] <= 0) {
-            throw new \InvalidArgumentException('price must be greater than zero');
-        }
-
-        // Validate stock if provided
-        if (isset($data['stock']) && (int) $data['stock'] < 0) {
-            throw new \InvalidArgumentException('stock cannot be negative');
+        try {
+            v::key('name', v::stringType()->notEmpty())
+                ->key('price', v::floatVal()->positive())
+                ->key('stock', v::optional(v::intVal()->min(0)))
+                ->assert($data);
+        } catch (NestedValidationException $e) {
+            $messages = $e->getMessages();
+            // Map Respect/Validation errors to user-friendly messages
+            if (array_any($messages, fn($msg) => str_contains(strtolower($msg), 'price'))) {
+                throw new \InvalidArgumentException('price must be greater than zero');
+            }
+            if (array_any($messages, fn($msg) => str_contains(strtolower($msg), 'stock'))) {
+                throw new \InvalidArgumentException('stock cannot be negative');
+            }
+            throw new \InvalidArgumentException(implode('; ', $messages));
         }
     }
 
