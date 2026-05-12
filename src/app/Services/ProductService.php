@@ -4,10 +4,9 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Exceptions\ValidationException;
 use App\Repositories\ProductRepository;
 use Predis\Client as RedisClient;
-use Respect\Validation\Validator as v;
-use Respect\Validation\Exceptions\NestedValidationException;
 
 /**
  * Business logic for product operations.
@@ -131,23 +130,34 @@ class ProductService
     }
 
     /**
-     * Validate input data for product creation using Respect/Validation.
+     * Validate input data for product creation.
+     *
+     * Uses manual checks that match original error messages for backward
+     * compatibility. The ValidationException carries structured details
+     * when multiple fields fail.
      */
     private function validateCreateData(array $data): void
     {
         // Check required fields exist
         if (!isset($data['name'], $data['price'])) {
-            throw new \InvalidArgumentException('name and price are required');
+            throw new ValidationException('name and price are required', [
+                'name' => !isset($data['name']) ? 'name is required' : null,
+                'price' => !isset($data['price']) ? 'price is required' : null,
+            ]);
         }
 
         // Validate price is positive
         if ((float) $data['price'] <= 0) {
-            throw new \InvalidArgumentException('price must be greater than zero');
+            throw new ValidationException('price must be greater than zero', [
+                'price' => 'price must be greater than zero',
+            ]);
         }
 
         // Validate stock if provided
         if (isset($data['stock']) && (int) $data['stock'] < 0) {
-            throw new \InvalidArgumentException('stock cannot be negative');
+            throw new ValidationException('stock cannot be negative', [
+                'stock' => 'stock cannot be negative',
+            ]);
         }
     }
 

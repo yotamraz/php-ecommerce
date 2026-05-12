@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Middleware;
 
+use App\Exceptions\ValidationException;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Server\MiddlewareInterface;
@@ -12,6 +13,12 @@ use Slim\Psr7\Response;
 
 /**
  * Catches exceptions and returns structured JSON error responses.
+ *
+ * Exception handling order matters:
+ * 1. ValidationException — structured error with details
+ * 2. InvalidArgumentException — simple error message (400)
+ * 3. RuntimeException — uses exception code as status (404, 409, etc.)
+ * 4. Throwable — generic 500
  */
 class ErrorHandlerMiddleware implements MiddlewareInterface
 {
@@ -19,12 +26,14 @@ class ErrorHandlerMiddleware implements MiddlewareInterface
     {
         try {
             return $handler->handle($request);
-        } catch (\Respect\Validation\Exceptions\NestedValidationException $e) {
+        } catch (ValidationException $e) {
             $response = new Response();
-            $response->getBody()->write(json_encode([
-                'error' => 'Validation failed',
-                'details' => $e->getMessages(),
-            ]));
+            $body = ['error' => $e->getMessage()];
+            $details = $e->getDetails();
+            if (!empty($details)) {
+                $body['details'] = $details;
+            }
+            $response->getBody()->write(json_encode($body));
             return $response
                 ->withStatus(400)
                 ->withHeader('Content-Type', 'application/json');
@@ -35,6 +44,16 @@ class ErrorHandlerMiddleware implements MiddlewareInterface
             ]));
             return $response
                 ->withStatus(400)
+                ->withHeader('Content-Type', 'application/json');
+        } catch (\RuntimeException $e) {
+            $code = $e->getCode();
+            $statusCode = ($code >= 400 && $code < 600) ? $code : 500;
+            $response = new Response();
+            $response->getBody()->write(json_encode([
+                'error' => $e->getMessage(),
+            ]));
+            return $response
+                ->withStatus($statusCode)
                 ->withHeader('Content-Type', 'application/json');
         } catch (\Throwable $e) {
             $response = new Response();

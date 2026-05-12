@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Exceptions\ValidationException;
 use App\Repositories\OrderRepository;
 use PDO;
 use Predis\Client as RedisClient;
@@ -123,21 +124,27 @@ class OrderService
     /**
      * Validate order creation input data.
      *
-     * @throws \InvalidArgumentException On validation failure
+     * @throws ValidationException On validation failure
      */
     private function validateOrderData(array $data): void
     {
         if (!isset($data['items']) || !is_array($data['items']) || empty($data['items'])) {
-            throw new \InvalidArgumentException('items array is required');
+            throw new ValidationException('items array is required', [
+                'items' => 'items array is required and must not be empty',
+            ]);
         }
 
         foreach ($data['items'] as $index => $item) {
             if (!isset($item['product_id'], $item['quantity'])) {
-                throw new \InvalidArgumentException('Each item needs product_id and quantity');
+                throw new ValidationException('Each item needs product_id and quantity', [
+                    "items[{$index}]" => 'product_id and quantity are required',
+                ]);
             }
 
             if ((int) $item['quantity'] < 1) {
-                throw new \InvalidArgumentException('Quantity must be at least 1');
+                throw new ValidationException('Quantity must be at least 1', [
+                    "items[{$index}].quantity" => 'Quantity must be at least 1',
+                ]);
             }
         }
     }

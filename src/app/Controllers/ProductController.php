@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controllers;
 
+use App\Exceptions\ValidationException;
 use App\Services\ProductService;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
@@ -56,6 +57,14 @@ class ProductController
             $product = $this->productService->createProduct($data ?? []);
             $response->getBody()->write(json_encode($product));
             return $response->withStatus(201);
+        } catch (ValidationException $e) {
+            $body = ['error' => $e->getMessage()];
+            $details = $e->getDetails();
+            if (!empty($details)) {
+                $body['details'] = $details;
+            }
+            $response->getBody()->write(json_encode($body));
+            return $response->withStatus(400);
         } catch (\InvalidArgumentException $e) {
             $response->getBody()->write(json_encode(['error' => $e->getMessage()]));
             return $response->withStatus(400);
