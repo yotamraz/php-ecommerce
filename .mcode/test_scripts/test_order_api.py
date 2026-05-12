@@ -6,7 +6,7 @@ and proper error handling against a running instance.
 import requests
 import pytest
 
-BASE_URL = "http://localhost:8082"
+BASE_URL = "http://localhost:8085"
 
 
 def _create_product(name="Order Test Product", price=29.99, stock=100):

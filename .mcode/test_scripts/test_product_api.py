@@ -5,7 +5,7 @@ Tests all product CRUD endpoints and health check against a running instance.
 import requests
 import pytest
 
-BASE_URL = "http://localhost:8082"
+BASE_URL = "http://localhost:8085"
 
 
 class TestHealthEndpoint:
