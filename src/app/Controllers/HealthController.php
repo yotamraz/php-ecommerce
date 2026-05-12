@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Controllers;
 
+use App\Services\EventPublisher;
 use PDO;
 use Predis\Client as RedisClient;
-use PhpAmqpLib\Connection\AMQPStreamConnection;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
 
@@ -18,7 +18,7 @@ class HealthController
     public function __construct(
         private PDO $db,
         private RedisClient $cache,
-        private AMQPStreamConnection $queue,
+        private EventPublisher $eventPublisher,
     ) {}
 
     /**
@@ -48,10 +48,10 @@ class HealthController
 
         // RabbitMQ
         try {
-            $status['services']['rabbitmq'] = $this->queue->isConnected()
-                ? 'connected'
-                : 'error';
-            if (!$this->queue->isConnected()) {
+            if ($this->eventPublisher->isConnected()) {
+                $status['services']['rabbitmq'] = 'connected';
+            } else {
+                $status['services']['rabbitmq'] = 'error';
                 $status['status'] = 'degraded';
             }
         } catch (\Exception $e) {

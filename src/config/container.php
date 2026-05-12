@@ -10,7 +10,6 @@ use App\Services\OrderService;
 use App\Services\ProductService;
 use DI\ContainerBuilder;
 use Predis\Client as RedisClient;
-use PhpAmqpLib\Connection\AMQPStreamConnection;
 use Psr\Container\ContainerInterface;
 
 return static function (ContainerBuilder $containerBuilder): void {
@@ -42,15 +41,7 @@ return static function (ContainerBuilder $containerBuilder): void {
             ]);
         },
 
-        // RabbitMQ connection
-        AMQPStreamConnection::class => static function (ContainerInterface $c): AMQPStreamConnection {
-            $config = $c->get(Config::class);
-            return new AMQPStreamConnection(
-                $config->rabbitmqHost,
-                $config->rabbitmqPort,
-                $config->rabbitmqUser,
-                $config->rabbitmqPass,
-            );
-        },
+        // EventPublisher (creates RabbitMQ connection lazily)
+        // Auto-wired: receives Config via constructor injection
     ]);
 };
