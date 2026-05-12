@@ -5,7 +5,7 @@ Tests all order endpoints plus product endpoints to verify nothing is broken.
 import requests
 import pytest
 
-BASE_URL = "http://localhost:8081"
+BASE_URL = "http://localhost:8082"
 
 
 # --- Health endpoint ---
