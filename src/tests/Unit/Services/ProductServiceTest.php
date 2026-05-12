@@ -9,17 +9,21 @@ use App\Services\ProductService;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Predis\Client as RedisClient;
+use Respect\Validation\Exceptions\NestedValidationException;
 
 class ProductServiceTest extends TestCase
 {
     private ProductRepository&MockObject $repository;
-    private RedisClient&MockObject $cache;
+    private MockObject $cache;
     private ProductService $service;
 
     protected function setUp(): void
     {
         $this->repository = $this->createMock(ProductRepository::class);
-        $this->cache = $this->createMock(RedisClient::class);
+        $this->cache = $this->getMockBuilder(RedisClient::class)
+            ->disableOriginalConstructor()
+            ->addMethods(['get', 'setex', 'del'])
+            ->getMock();
         $this->service = new ProductService($this->repository, $this->cache);
     }
 
@@ -69,28 +73,55 @@ class ProductServiceTest extends TestCase
         $this->assertNull($result);
     }
 
-    public function testCreateProductValidatesRequiredFields(): void
+    // --- Validation tests (Respect/Validation) ---
+
+    public function testCreateProductMissingNameThrowsValidation(): void
     {
-        $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('name and price are required');
+        $this->expectException(NestedValidationException::class);
+
+        $this->service->createProduct(['price' => 10.00]);
+    }
+
+    public function testCreateProductMissingPriceThrowsValidation(): void
+    {
+        $this->expectException(NestedValidationException::class);
+
+        $this->service->createProduct(['name' => 'Test']);
+    }
+
+    public function testCreateProductEmptyBodyThrowsValidation(): void
+    {
+        $this->expectException(NestedValidationException::class);
 
         $this->service->createProduct([]);
     }
 
-    public function testCreateProductValidatesPricePositive(): void
+    public function testCreateProductZeroPriceThrowsValidation(): void
     {
-        $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('price must be greater than zero');
+        $this->expectException(NestedValidationException::class);
+
+        $this->service->createProduct(['name' => 'Test', 'price' => 0]);
+    }
+
+    public function testCreateProductNegativePriceThrowsValidation(): void
+    {
+        $this->expectException(NestedValidationException::class);
 
         $this->service->createProduct(['name' => 'Test', 'price' => -5]);
     }
 
-    public function testCreateProductValidatesStockNonNegative(): void
+    public function testCreateProductNegativeStockThrowsValidation(): void
     {
-        $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('stock cannot be negative');
+        $this->expectException(NestedValidationException::class);
 
         $this->service->createProduct(['name' => 'Test', 'price' => 10, 'stock' => -1]);
+    }
+
+    public function testCreateProductEmptyNameThrowsValidation(): void
+    {
+        $this->expectException(NestedValidationException::class);
+
+        $this->service->createProduct(['name' => '', 'price' => 10]);
     }
 
     public function testCreateProductSuccess(): void
@@ -108,6 +139,21 @@ class ProductServiceTest extends TestCase
         $this->assertEquals('New Product', $result['name']);
     }
 
+    public function testCreateProductWithOptionalDescription(): void
+    {
+        $data = ['name' => 'With Desc', 'price' => 15.00, 'description' => 'A description'];
+        $dbRow = ['id' => 6, 'name' => 'With Desc', 'description' => 'A description', 'price' => 15.00, 'stock' => 0, 'created_at' => '2024-01-01', 'updated_at' => '2024-01-01'];
+
+        $this->repository->method('create')->willReturn(6);
+        $this->repository->method('findById')->with(6)->willReturn($dbRow);
+
+        $result = $this->service->createProduct($data);
+
+        $this->assertEquals('A description', $result['description']);
+    }
+
+    // --- Update tests ---
+
     public function testUpdateProductNotFound(): void
     {
         $this->repository->method('exists')->with(999)->willReturn(false);
@@ -123,9 +169,26 @@ class ProductServiceTest extends TestCase
         $this->repository->method('exists')->with(1)->willReturn(true);
 
         $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('No fields to update');
 
         $this->service->updateProduct(1, []);
+    }
+
+    public function testUpdateProductNegativePriceThrowsValidation(): void
+    {
+        $this->repository->method('exists')->with(1)->willReturn(true);
+
+        $this->expectException(NestedValidationException::class);
+
+        $this->service->updateProduct(1, ['price' => -10]);
+    }
+
+    public function testUpdateProductNegativeStockThrowsValidation(): void
+    {
+        $this->repository->method('exists')->with(1)->willReturn(true);
+
+        $this->expectException(NestedValidationException::class);
+
+        $this->service->updateProduct(1, ['stock' => -5]);
     }
 
     public function testUpdateProductSuccess(): void
@@ -140,6 +203,8 @@ class ProductServiceTest extends TestCase
         $this->assertEquals('Updated', $result['name']);
     }
 
+    // --- Delete tests ---
+
     public function testDeleteProductNotFound(): void
     {
         $this->repository->method('delete')->with(999)->willReturn(false);
@@ -152,10 +217,12 @@ class ProductServiceTest extends TestCase
 
     public function testDeleteProductWithOrdersThrows409(): void
     {
-        $pdoException = new \PDOException('FK constraint', '23000');
+        $pdoException = new \PDOException('FK constraint');
         $pdoException->errorInfo = ['23000', 1451, 'FK constraint'];
-        // Set the code via reflection since PDOException constructor doesn't accept string code
-        $ref = new \ReflectionProperty(\PDOException::class, 'code');
+        // PDOException stores the SQLSTATE code as a string in the $code property
+        // We use reflection to set it since the constructor only accepts int
+        $ref = new \ReflectionProperty(\Exception::class, 'code');
+        $ref->setAccessible(true);
         $ref->setValue($pdoException, '23000');
 
         $this->repository->method('delete')->willThrowException($pdoException);
@@ -170,10 +237,8 @@ class ProductServiceTest extends TestCase
     {
         $this->repository->method('delete')->with(1)->willReturn(true);
 
-        // Should not throw
         $this->service->deleteProduct(1);
 
-        // Verify cache invalidation happened (implicit - no exception means success)
         $this->assertTrue(true);
     }
 }

@@ -18,7 +18,9 @@ class OrderApiTest extends TestCase
 
         $this->assertEquals(400, $response->getStatusCode());
         $body = $this->getResponseBody($response);
-        $this->assertStringContainsString('items', $body['error']);
+        // NestedValidationException caught by ErrorHandlerMiddleware
+        $this->assertEquals('Validation failed', $body['error']);
+        $this->assertArrayHasKey('details', $body);
     }
 
     public function testCreateOrderEmptyItems(): void
@@ -27,7 +29,16 @@ class OrderApiTest extends TestCase
 
         $this->assertEquals(400, $response->getStatusCode());
         $body = $this->getResponseBody($response);
-        $this->assertStringContainsString('empty', $body['error']);
+        $this->assertEquals('Validation failed', $body['error']);
+    }
+
+    public function testCreateOrderItemsNotArray(): void
+    {
+        $response = $this->request('POST', '/api/orders', ['items' => 'invalid']);
+
+        $this->assertEquals(400, $response->getStatusCode());
+        $body = $this->getResponseBody($response);
+        $this->assertEquals('Validation failed', $body['error']);
     }
 
     public function testCreateOrderMissingProductId(): void
@@ -38,7 +49,8 @@ class OrderApiTest extends TestCase
 
         $this->assertEquals(400, $response->getStatusCode());
         $body = $this->getResponseBody($response);
-        $this->assertStringContainsString('product_id', $body['error']);
+        // Item-level validation returns InvalidArgumentException with items[0] context
+        $this->assertStringContainsString('items[0]', $body['error']);
     }
 
     public function testCreateOrderMissingQuantity(): void
@@ -49,7 +61,7 @@ class OrderApiTest extends TestCase
 
         $this->assertEquals(400, $response->getStatusCode());
         $body = $this->getResponseBody($response);
-        $this->assertStringContainsString('quantity', $body['error']);
+        $this->assertStringContainsString('items[0]', $body['error']);
     }
 
     public function testCreateOrderZeroQuantity(): void
@@ -60,7 +72,18 @@ class OrderApiTest extends TestCase
 
         $this->assertEquals(400, $response->getStatusCode());
         $body = $this->getResponseBody($response);
-        $this->assertStringContainsString('quantity', $body['error']);
+        $this->assertStringContainsString('items[0]', $body['error']);
+    }
+
+    public function testCreateOrderNegativeQuantity(): void
+    {
+        $response = $this->request('POST', '/api/orders', [
+            'items' => [['product_id' => 1, 'quantity' => -3]],
+        ]);
+
+        $this->assertEquals(400, $response->getStatusCode());
+        $body = $this->getResponseBody($response);
+        $this->assertStringContainsString('items[0]', $body['error']);
     }
 
     public function testCreateOrderNonExistentProduct(): void

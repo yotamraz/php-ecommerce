@@ -10,12 +10,13 @@ use App\Services\OrderService;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Predis\Client as RedisClient;
+use Respect\Validation\Exceptions\NestedValidationException;
 
 class OrderServiceTest extends TestCase
 {
     private OrderRepository&MockObject $orderRepository;
     private EventPublisher&MockObject $eventPublisher;
-    private RedisClient&MockObject $cache;
+    private MockObject $cache;
     private OrderService $service;
     private \PDO&MockObject $pdo;
 
@@ -26,7 +27,10 @@ class OrderServiceTest extends TestCase
         $this->orderRepository->method('getConnection')->willReturn($this->pdo);
 
         $this->eventPublisher = $this->createMock(EventPublisher::class);
-        $this->cache = $this->createMock(RedisClient::class);
+        $this->cache = $this->getMockBuilder(RedisClient::class)
+            ->disableOriginalConstructor()
+            ->addMethods(['get', 'setex', 'del'])
+            ->getMock();
 
         $this->service = new OrderService(
             $this->orderRepository,
@@ -35,52 +39,49 @@ class OrderServiceTest extends TestCase
         );
     }
 
-    // --- Validation tests ---
+    // --- Validation tests (Respect/Validation) ---
 
-    public function testCreateOrderRequiresItems(): void
+    public function testCreateOrderMissingItemsThrowsValidation(): void
     {
-        $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('items is required and must be an array');
+        $this->expectException(NestedValidationException::class);
 
         $this->service->createOrder([]);
     }
 
-    public function testCreateOrderItemsMustBeArray(): void
+    public function testCreateOrderItemsNotArrayThrowsValidation(): void
     {
-        $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('items is required and must be an array');
+        $this->expectException(NestedValidationException::class);
 
         $this->service->createOrder(['items' => 'not-an-array']);
     }
 
-    public function testCreateOrderItemsCannotBeEmpty(): void
+    public function testCreateOrderEmptyItemsThrowsValidation(): void
     {
-        $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('items cannot be empty');
+        $this->expectException(NestedValidationException::class);
 
         $this->service->createOrder(['items' => []]);
     }
 
-    public function testCreateOrderItemRequiresProductId(): void
+    public function testCreateOrderItemMissingProductId(): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('items[0].product_id is required');
+        $this->expectExceptionMessage('items[0]');
 
         $this->service->createOrder(['items' => [['quantity' => 1]]]);
     }
 
-    public function testCreateOrderItemRequiresQuantity(): void
+    public function testCreateOrderItemMissingQuantity(): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('items[0].quantity is required');
+        $this->expectExceptionMessage('items[0]');
 
         $this->service->createOrder(['items' => [['product_id' => 1]]]);
     }
 
-    public function testCreateOrderItemQuantityMustBePositive(): void
+    public function testCreateOrderItemZeroQuantityRejected(): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('items[0].quantity must be a positive integer');
+        $this->expectExceptionMessage('items[0]');
 
         $this->service->createOrder(['items' => [['product_id' => 1, 'quantity' => 0]]]);
     }
@@ -88,7 +89,7 @@ class OrderServiceTest extends TestCase
     public function testCreateOrderItemNegativeQuantityRejected(): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('items[0].quantity must be a positive integer');
+        $this->expectExceptionMessage('items[0]');
 
         $this->service->createOrder(['items' => [['product_id' => 1, 'quantity' => -5]]]);
     }
@@ -148,7 +149,6 @@ class OrderServiceTest extends TestCase
         ];
         $this->orderRepository->method('findById')->with(1)->willReturn($createdOrder);
 
-        // Verify event is published after commit
         $this->eventPublisher->expects($this->once())->method('publish')
             ->with('order_created', $this->callback(function ($data) {
                 return $data['order_id'] === 1 && $data['total'] === 20.00;
@@ -226,7 +226,6 @@ class OrderServiceTest extends TestCase
         $this->eventPublisher->method('publish')
             ->willThrowException(new \RuntimeException('RabbitMQ down'));
 
-        // Should not throw
         $result = $this->service->createOrder(['items' => [['product_id' => 1, 'quantity' => 1]]]);
         $this->assertEquals(1, $result['id']);
     }
@@ -281,7 +280,6 @@ class OrderServiceTest extends TestCase
         $this->orderRepository->method('findById')->willReturn($createdOrder);
         $this->eventPublisher->method('publish');
 
-        // Expect cache invalidation: products:all + products:1
         $deletedKeys = [];
         $this->cache->method('del')->willReturnCallback(function ($key) use (&$deletedKeys) {
             $deletedKeys[] = $key;

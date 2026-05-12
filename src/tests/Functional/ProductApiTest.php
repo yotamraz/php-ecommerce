@@ -58,17 +58,41 @@ class ProductApiTest extends TestCase
         $this->assertArrayHasKey('id', $body);
     }
 
-    public function testCreateProductMissingRequiredFields(): void
+    public function testCreateProductMissingRequiredFieldsReturns400(): void
     {
         $response = $this->request('POST', '/api/products', []);
 
         $this->assertEquals(400, $response->getStatusCode());
 
         $body = $this->getResponseBody($response);
-        $this->assertEquals('name and price are required', $body['error']);
+        // Respect/Validation returns structured error via ErrorHandlerMiddleware
+        $this->assertEquals('Validation failed', $body['error']);
+        $this->assertArrayHasKey('details', $body);
     }
 
-    public function testCreateProductNegativePrice(): void
+    public function testCreateProductMissingNameReturns400(): void
+    {
+        $response = $this->request('POST', '/api/products', ['price' => 10.00]);
+
+        $this->assertEquals(400, $response->getStatusCode());
+
+        $body = $this->getResponseBody($response);
+        $this->assertEquals('Validation failed', $body['error']);
+        $this->assertArrayHasKey('details', $body);
+    }
+
+    public function testCreateProductMissingPriceReturns400(): void
+    {
+        $response = $this->request('POST', '/api/products', ['name' => 'Test']);
+
+        $this->assertEquals(400, $response->getStatusCode());
+
+        $body = $this->getResponseBody($response);
+        $this->assertEquals('Validation failed', $body['error']);
+        $this->assertArrayHasKey('details', $body);
+    }
+
+    public function testCreateProductNegativePriceReturns400(): void
     {
         $response = $this->request('POST', '/api/products', [
             'name' => 'Bad Product',
@@ -78,10 +102,24 @@ class ProductApiTest extends TestCase
         $this->assertEquals(400, $response->getStatusCode());
 
         $body = $this->getResponseBody($response);
-        $this->assertEquals('price must be greater than zero', $body['error']);
+        $this->assertEquals('Validation failed', $body['error']);
+        $this->assertArrayHasKey('details', $body);
     }
 
-    public function testCreateProductNegativeStock(): void
+    public function testCreateProductZeroPriceReturns400(): void
+    {
+        $response = $this->request('POST', '/api/products', [
+            'name' => 'Zero Price',
+            'price' => 0,
+        ]);
+
+        $this->assertEquals(400, $response->getStatusCode());
+
+        $body = $this->getResponseBody($response);
+        $this->assertEquals('Validation failed', $body['error']);
+    }
+
+    public function testCreateProductNegativeStockReturns400(): void
     {
         $response = $this->request('POST', '/api/products', [
             'name' => 'Bad Stock Product',
@@ -92,7 +130,21 @@ class ProductApiTest extends TestCase
         $this->assertEquals(400, $response->getStatusCode());
 
         $body = $this->getResponseBody($response);
-        $this->assertEquals('stock cannot be negative', $body['error']);
+        $this->assertEquals('Validation failed', $body['error']);
+        $this->assertArrayHasKey('details', $body);
+    }
+
+    public function testCreateProductEmptyNameReturns400(): void
+    {
+        $response = $this->request('POST', '/api/products', [
+            'name' => '',
+            'price' => 10,
+        ]);
+
+        $this->assertEquals(400, $response->getStatusCode());
+
+        $body = $this->getResponseBody($response);
+        $this->assertEquals('Validation failed', $body['error']);
     }
 
     public function testGetProductAfterCreate(): void
@@ -167,7 +219,7 @@ class ProductApiTest extends TestCase
         $this->assertEquals(400, $response->getStatusCode());
 
         $body = $this->getResponseBody($response);
-        $this->assertEquals('No fields to update', $body['error']);
+        $this->assertArrayHasKey('error', $body);
     }
 
     public function testDeleteProductSuccess(): void
