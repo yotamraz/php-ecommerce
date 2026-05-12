@@ -96,9 +96,10 @@ class ProductService
 
         $fields = $this->extractUpdateFields($data);
         if (empty($fields)) {
-            throw new \InvalidArgumentException('No fields to update');
+            throw new \InvalidArgumentException('No valid fields to update');
         }
 
+        $this->validateUpdateData($fields);
         $this->repository->update($id, $fields);
         $this->invalidateProductCache($id);
         $this->invalidateListCache();
@@ -132,22 +133,36 @@ class ProductService
 
     /**
      * Validate input data for product creation using Respect/Validation.
+     *
+     * @throws NestedValidationException If validation fails
      */
     private function validateCreateData(array $data): void
     {
-        // Check required fields exist
-        if (!isset($data['name'], $data['price'])) {
-            throw new \InvalidArgumentException('name and price are required');
+        v::keySet(
+            v::key('name', v::stringType()->notEmpty()->setName('name')),
+            v::key('price', v::floatVal()->positive()->setName('price')),
+            v::key('description', v::optional(v::stringType()), false),
+            v::key('stock', v::optional(v::intVal()->min(0)), false),
+        )->assert($data);
+    }
+
+    /**
+     * Validate update fields using Respect/Validation.
+     *
+     * @throws NestedValidationException If validation fails
+     */
+    private function validateUpdateData(array $data): void
+    {
+        if (array_key_exists('price', $data)) {
+            v::key('price', v::floatVal()->positive()->setName('price'))->assert($data);
         }
 
-        // Validate price is positive
-        if ((float) $data['price'] <= 0) {
-            throw new \InvalidArgumentException('price must be greater than zero');
+        if (array_key_exists('stock', $data)) {
+            v::key('stock', v::intVal()->min(0)->setName('stock'))->assert($data);
         }
 
-        // Validate stock if provided
-        if (isset($data['stock']) && (int) $data['stock'] < 0) {
-            throw new \InvalidArgumentException('stock cannot be negative');
+        if (array_key_exists('name', $data)) {
+            v::key('name', v::stringType()->notEmpty()->setName('name'))->assert($data);
         }
     }
 
