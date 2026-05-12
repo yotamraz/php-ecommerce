@@ -3,7 +3,10 @@
 declare(strict_types=1);
 
 use App\Config\Config;
+use App\Repositories\OrderRepository;
 use App\Repositories\ProductRepository;
+use App\Services\EventPublisher;
+use App\Services\OrderService;
 use App\Services\ProductService;
 use DI\ContainerBuilder;
 use Predis\Client as RedisClient;

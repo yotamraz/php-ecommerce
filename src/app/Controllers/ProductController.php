@@ -11,6 +11,7 @@ use Psr\Http\Message\ServerRequestInterface as Request;
 /**
  * HTTP controller for product endpoints.
  * Handles PSR-7 request/response and delegates to ProductService.
+ * Exceptions (RuntimeException, InvalidArgumentException) are handled by ErrorHandlerMiddleware.
  */
 class ProductController
 {
@@ -37,8 +38,7 @@ class ProductController
         $product = $this->productService->getProduct($id);
 
         if ($product === null) {
-            $response->getBody()->write(json_encode(['error' => 'Product not found']));
-            return $response->withStatus(404);
+            throw new \RuntimeException('Product not found', 404);
         }
 
         $response->getBody()->write(json_encode($product));
@@ -51,15 +51,9 @@ class ProductController
     public function create(Request $request, Response $response): Response
     {
         $data = $request->getParsedBody();
-
-        try {
-            $product = $this->productService->createProduct($data ?? []);
-            $response->getBody()->write(json_encode($product));
-            return $response->withStatus(201);
-        } catch (\InvalidArgumentException $e) {
-            $response->getBody()->write(json_encode(['error' => $e->getMessage()]));
-            return $response->withStatus(400);
-        }
+        $product = $this->productService->createProduct($data ?? []);
+        $response->getBody()->write(json_encode($product));
+        return $response->withStatus(201);
     }
 
     /**
@@ -69,18 +63,9 @@ class ProductController
     {
         $id = (int) $args['id'];
         $data = $request->getParsedBody();
-
-        try {
-            $product = $this->productService->updateProduct($id, $data ?? []);
-            $response->getBody()->write(json_encode($product));
-            return $response;
-        } catch (\InvalidArgumentException $e) {
-            $response->getBody()->write(json_encode(['error' => $e->getMessage()]));
-            return $response->withStatus(400);
-        } catch (\RuntimeException $e) {
-            $response->getBody()->write(json_encode(['error' => $e->getMessage()]));
-            return $response->withStatus($e->getCode());
-        }
+        $product = $this->productService->updateProduct($id, $data ?? []);
+        $response->getBody()->write(json_encode($product));
+        return $response;
     }
 
     /**
@@ -89,13 +74,7 @@ class ProductController
     public function delete(Request $request, Response $response, array $args): Response
     {
         $id = (int) $args['id'];
-
-        try {
-            $this->productService->deleteProduct($id);
-            return $response->withStatus(204);
-        } catch (\RuntimeException $e) {
-            $response->getBody()->write(json_encode(['error' => $e->getMessage()]));
-            return $response->withStatus($e->getCode());
-        }
+        $this->productService->deleteProduct($id);
+        return $response->withStatus(204);
     }
 }
