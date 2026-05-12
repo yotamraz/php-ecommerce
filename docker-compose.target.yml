@@ -1,0 +1,24 @@
+services:
+  mysql:
+    container_name: ecommerce-m2-mysql
+    ports:
+      - "3307:3306"
+
+  redis:
+    container_name: ecommerce-m2-redis
+    ports:
+      - "6380:6379"
+
+  rabbitmq:
+    container_name: ecommerce-m2-rabbitmq
+    ports:
+      - "5673:5672"
+      - "15673:15672"
+
+  php:
+    container_name: ecommerce-m2-php
+
+  nginx:
+    container_name: ecommerce-m2-nginx
+    ports:
+      - "8081:80"
