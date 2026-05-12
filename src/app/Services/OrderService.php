@@ -7,6 +7,8 @@ namespace App\Services;
 use App\Repositories\OrderRepository;
 use App\Services\EventPublisher;
 use Predis\Client as RedisClient;
+use Respect\Validation\Validator as v;
+use Respect\Validation\Exceptions\NestedValidationException;
 
 /**
  * Business logic for order operations.
@@ -127,32 +129,33 @@ class OrderService
     }
 
     /**
-     * Validate order input data.
+     * Validate order input data using Respect/Validation.
      *
-     * @throws \InvalidArgumentException If validation fails
+     * @throws NestedValidationException If validation fails
      */
     private function validateOrderData(array $data): void
     {
-        if (!isset($data['items']) || !is_array($data['items'])) {
-            throw new \InvalidArgumentException('items is required and must be an array');
-        }
+        // Validate top-level structure: items must be a non-empty array
+        v::key('items', v::arrayType()->notEmpty()->setName('items'))
+            ->assert($data);
 
-        if (empty($data['items'])) {
-            throw new \InvalidArgumentException('items cannot be empty');
-        }
+        // Validate each item has product_id and a positive quantity
+        $itemValidator = v::keySet(
+            v::key('product_id', v::intVal()->positive()->setName('product_id')),
+            v::key('quantity', v::intVal()->positive()->setName('quantity')),
+        );
 
         foreach ($data['items'] as $index => $item) {
-            if (!isset($item['product_id'])) {
-                throw new \InvalidArgumentException("items[{$index}].product_id is required");
+            if (!is_array($item)) {
+                throw new \InvalidArgumentException("items[{$index}] must be an object");
             }
-
-            if (!isset($item['quantity'])) {
-                throw new \InvalidArgumentException("items[{$index}].quantity is required");
-            }
-
-            $quantity = $item['quantity'];
-            if (!is_numeric($quantity) || (int) $quantity <= 0) {
-                throw new \InvalidArgumentException("items[{$index}].quantity must be a positive integer");
+            try {
+                $itemValidator->assert($item);
+            } catch (NestedValidationException $e) {
+                // Re-throw with item index context for better error messages
+                throw new \InvalidArgumentException(
+                    "items[{$index}]: " . implode('; ', $e->getMessages())
+                );
             }
         }
     }
