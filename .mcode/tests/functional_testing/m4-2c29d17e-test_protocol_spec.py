@@ -9,7 +9,7 @@ This script supports two modes:
 1. SRC Validation: Tests endpoints and captures responses (no expected_response)
 2. DST Contract Validation: Tests endpoints and validates responses match expected (has expected_response)
 
-Generated at: 2026-05-15T10:28:46.945702+00:00
+Generated at: 2026-05-15T10:31:11.649247+00:00
 Project: php-ecommerce
 Milestone: 4
 """
@@ -342,20 +342,23 @@ TEST_CASES: list[dict[str, Any]] = resolve_env_placeholders(
         "category": "BOUNDARY",
         "endpoint": "/api/products/{id}",
         "method": "DELETE",
-        "description": "Create a product, create an order referencing it, then attempt to delete the product \u2014 expect 409 FK constraint",
+        "description": "Create an order referencing a seed product, then attempt to delete that product \u2014 expect 409 FK constraint",
         "setup": {
-            "endpoint": "/api/products",
+            "endpoint": "/api/orders",
             "method": "POST",
             "body": {
-                "name": "FK Constraint Product",
-                "price": 30.0,
-                "stock": 10
+                "items": [
+                    {
+                        "product_id": 5,
+                        "quantity": 1
+                    }
+                ]
             },
             "extract_id_from": "id"
         },
         "request_data": {
             "path": {
-                "id": "$setup_id"
+                "id": 5
             },
             "query": {},
             "body": null
@@ -383,30 +386,21 @@ TEST_CASES: list[dict[str, Any]] = resolve_env_placeholders(
         "category": "HAPPY_PATH",
         "endpoint": "/api/orders",
         "method": "POST",
-        "description": "Create a product with stock, then create an order for it, expect 201 with order details",
-        "setup": {
-            "endpoint": "/api/products",
-            "method": "POST",
-            "body": {
-                "name": "Orderable Product",
-                "price": 45.0,
-                "stock": 100
-            },
-            "extract_id_from": "id"
-        },
+        "description": "Create an order for a seed product, expect 201 with order details",
         "request_data": {
             "path": {},
             "query": {},
             "body": {
                 "items": [
                     {
-                        "product_id": "$setup_id",
+                        "product_id": 1,
                         "quantity": 2
                     }
                 ]
             }
         },
         "expected_status": 201,
+        "setup": null,
         "cleanup": null
     },
     {
@@ -468,30 +462,21 @@ TEST_CASES: list[dict[str, Any]] = resolve_env_placeholders(
         "category": "BOUNDARY",
         "endpoint": "/api/orders",
         "method": "POST",
-        "description": "Create a product with limited stock, attempt to order more than available, expect 400",
-        "setup": {
-            "endpoint": "/api/products",
-            "method": "POST",
-            "body": {
-                "name": "Low Stock Product",
-                "price": 10.0,
-                "stock": 2
-            },
-            "extract_id_from": "id"
-        },
+        "description": "Attempt to order more than available stock of a seed product, expect 400",
         "request_data": {
             "path": {},
             "query": {},
             "body": {
                 "items": [
                     {
-                        "product_id": "$setup_id",
-                        "quantity": 100
+                        "product_id": 4,
+                        "quantity": 99999
                     }
                 ]
             }
         },
         "expected_status": 400,
+        "setup": null,
         "cleanup": null
     },
     {
@@ -499,14 +484,17 @@ TEST_CASES: list[dict[str, Any]] = resolve_env_placeholders(
         "category": "HAPPY_PATH",
         "endpoint": "/api/orders/{id}",
         "method": "GET",
-        "description": "Create a product and order, then retrieve the order by ID with items",
+        "description": "Create an order for a seed product, then retrieve the order by ID with items",
         "setup": {
-            "endpoint": "/api/products",
+            "endpoint": "/api/orders",
             "method": "POST",
             "body": {
-                "name": "Order Fetch Product",
-                "price": 12.5,
-                "stock": 50
+                "items": [
+                    {
+                        "product_id": 2,
+                        "quantity": 1
+                    }
+                ]
             },
             "extract_id_from": "id"
         },
