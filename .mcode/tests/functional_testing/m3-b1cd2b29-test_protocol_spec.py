@@ -9,7 +9,7 @@ This script supports two modes:
 1. SRC Validation: Tests endpoints and captures responses (no expected_response)
 2. DST Contract Validation: Tests endpoints and validates responses match expected (has expected_response)
 
-Generated at: 2026-05-15T10:29:15.135239+00:00
+Generated at: 2026-05-15T10:30:31.292711+00:00
 Project: php-ecommerce
 Milestone: 3
 """
@@ -343,30 +343,21 @@ TEST_CASES: list[dict[str, Any]] = resolve_env_placeholders(
         "category": "HAPPY_PATH",
         "endpoint": "/api/orders",
         "method": "POST",
-        "description": "Create a product with stock, place an order for it (triggers cache invalidation for product), then verify 201",
-        "setup": {
-            "endpoint": "/api/products",
-            "method": "POST",
-            "body": {
-                "name": "Orderable Widget",
-                "price": 15.0,
-                "stock": 20
-            },
-            "extract_id_from": "id"
-        },
+        "description": "Place an order using a seeded product (ID 1, stock 150), expect 201",
         "request_data": {
             "path": {},
             "query": {},
             "body": {
                 "items": [
                     {
-                        "product_id": "$setup_id",
+                        "product_id": 1,
                         "quantity": 2
                     }
                 ]
             }
         },
         "expected_status": 201,
+        "setup": null,
         "cleanup": null
     },
     {
