@@ -174,6 +174,7 @@ class Router
         $product->setStock((int) ($data['stock'] ?? 0));
         $this->em->persist($product);
         $this->em->flush();
+        $this->em->refresh($product);
         $id = $product->getId();
 
         $this->cache->del('products:all');
@@ -204,6 +205,7 @@ class Router
         if (isset($data['price']))       $product->setPrice((string) $data['price']);
         if (isset($data['stock']))       $product->setStock((int) $data['stock']);
         $this->em->flush();
+        $this->em->refresh($product);
 
         $this->cache->del("products:{$id}");
         $this->cache->del('products:all');
