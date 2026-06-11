@@ -22,4 +22,4 @@ $connection = DriverManager::getConnection([
     'charset'  => 'utf8mb4',
 ], $config);
 
-return EntityManager::create($connection, $config);
+return new EntityManager($connection, $config);
