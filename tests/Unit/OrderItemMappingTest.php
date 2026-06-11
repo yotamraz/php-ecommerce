@@ -52,11 +52,11 @@ class OrderItemMappingTest extends TestCase
         $assoc = $this->meta->getAssociationMapping('order');
         $this->assertSame(ClassMetadata::MANY_TO_ONE, $assoc->type());
         $this->assertSame(Order::class, $assoc->targetEntity);
-        // Check join column
-        $joinColumns = $assoc->joinColumns ?? [];
-        $this->assertNotEmpty($joinColumns);
-        $joinCol = is_array($joinColumns[0]) ? (object) $joinColumns[0] : $joinColumns[0];
-        $this->assertSame('order_id', $joinCol->name ?? $joinCol['name'] ?? null);
+        // Check join column name and ON DELETE action (must match db/init.sql ON DELETE CASCADE)
+        $this->assertNotEmpty($assoc->joinColumns);
+        $joinCol = $assoc->joinColumns[0];
+        $this->assertSame('order_id', $joinCol->name);
+        $this->assertSame('CASCADE', $joinCol->onDelete);
     }
 
     public function testProductAssociation(): void
@@ -65,10 +65,10 @@ class OrderItemMappingTest extends TestCase
         $assoc = $this->meta->getAssociationMapping('product');
         $this->assertSame(ClassMetadata::MANY_TO_ONE, $assoc->type());
         $this->assertSame(Product::class, $assoc->targetEntity);
-        // Check join column
-        $joinColumns = $assoc->joinColumns ?? [];
-        $this->assertNotEmpty($joinColumns);
-        $joinCol = is_array($joinColumns[0]) ? (object) $joinColumns[0] : $joinColumns[0];
-        $this->assertSame('product_id', $joinCol->name ?? $joinCol['name'] ?? null);
+        // Check join column name and ON DELETE action (must match db/init.sql ON DELETE RESTRICT)
+        $this->assertNotEmpty($assoc->joinColumns);
+        $joinCol = $assoc->joinColumns[0];
+        $this->assertSame('product_id', $joinCol->name);
+        $this->assertSame('RESTRICT', $joinCol->onDelete);
     }
 }
