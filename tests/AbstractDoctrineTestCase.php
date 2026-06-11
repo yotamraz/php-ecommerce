@@ -24,7 +24,7 @@ abstract class AbstractDoctrineTestCase extends TestCase
             'memory' => true,
         ], $config);
 
-        $this->em = EntityManager::create($connection, $config);
+        $this->em = new EntityManager($connection, $config);
 
         $schemaTool = new SchemaTool($this->em);
         $schemaTool->createSchema(

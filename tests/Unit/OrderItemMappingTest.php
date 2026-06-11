@@ -22,7 +22,7 @@ class OrderItemMappingTest extends TestCase
             isDevMode: true,
         );
         $conn = DriverManager::getConnection(['driver' => 'pdo_sqlite', 'memory' => true], $config);
-        $em = EntityManager::create($conn, $config);
+        $em = new EntityManager($conn, $config);
         $this->meta = $em->getClassMetadata(OrderItem::class);
     }
 
