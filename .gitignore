@@ -2,3 +2,4 @@ src/vendor/
 src/composer.lock
 .env
 .DS_Store
+.phpunit.cache/
