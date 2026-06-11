@@ -2,19 +2,20 @@
 
 namespace App;
 
-use PDO;
+use Doctrine\ORM\EntityManager;
+use Doctrine\DBAL\LockMode;
 use Predis\Client as RedisClient;
 use PhpAmqpLib\Connection\AMQPStreamConnection;
 
 class Router
 {
-    private PDO $db;
+    private EntityManager $em;
     private RedisClient $cache;
     private AMQPStreamConnection $queue;
 
-    public function __construct(PDO $db, RedisClient $cache, AMQPStreamConnection $queue)
+    public function __construct(EntityManager $em, RedisClient $cache, AMQPStreamConnection $queue)
     {
-        $this->db = $db;
+        $this->em = $em;
         $this->cache = $cache;
         $this->queue = $queue;
     }
@@ -74,7 +75,7 @@ class Router
 
         // MySQL
         try {
-            $this->db->query('SELECT 1');
+            $this->em->getConnection()->executeQuery('SELECT 1');
             $status['services']['mysql'] = 'connected';
         } catch (\Exception $e) {
             $status['services']['mysql'] = 'error';
@@ -114,10 +115,11 @@ class Router
             return;
         }
 
-        $stmt = $this->db->query('SELECT * FROM products ORDER BY id');
-        $products = $stmt->fetchAll();
+        /** @var \App\Repository\ProductRepository $repo */
+        $repo = $this->em->getRepository(\App\Entity\Product::class);
+        $products = $repo->findAllOrdered();
 
-        $json = json_encode($products);
+        $json = json_encode(array_map([$this, 'serializeProduct'], $products));
         $this->cache->setex('products:all', 60, $json);
         echo $json;
     }
@@ -130,9 +132,7 @@ class Router
             return;
         }
 
-        $stmt = $this->db->prepare('SELECT * FROM products WHERE id = ?');
-        $stmt->execute([$id]);
-        $product = $stmt->fetch();
+        $product = $this->em->find(\App\Entity\Product::class, $id);
 
         if (!$product) {
             http_response_code(404);
@@ -140,7 +140,7 @@ class Router
             return;
         }
 
-        $json = json_encode($product);
+        $json = json_encode($this->serializeProduct($product));
         $this->cache->setex("products:{$id}", 60, $json);
         echo $json;
     }
@@ -167,17 +167,15 @@ class Router
             return;
         }
 
-        $stmt = $this->db->prepare(
-            'INSERT INTO products (name, description, price, stock) VALUES (?, ?, ?, ?)'
-        );
-        $stmt->execute([
-            $data['name'],
-            $data['description'] ?? '',
-            (float) $data['price'],
-            (int) ($data['stock'] ?? 0),
-        ]);
+        $product = new \App\Entity\Product();
+        $product->setName($data['name']);
+        $product->setDescription($data['description'] ?? null);
+        $product->setPrice((string) $data['price']);
+        $product->setStock((int) ($data['stock'] ?? 0));
+        $this->em->persist($product);
+        $this->em->flush();
+        $id = $product->getId();
 
-        $id = (int) $this->db->lastInsertId();
         $this->cache->del('products:all');
 
         http_response_code(201);
@@ -188,32 +186,24 @@ class Router
     {
         $data = json_decode(file_get_contents('php://input'), true);
 
-        $stmt = $this->db->prepare('SELECT id FROM products WHERE id = ?');
-        $stmt->execute([$id]);
-        if (!$stmt->fetch()) {
+        $product = $this->em->find(\App\Entity\Product::class, $id);
+        if (!$product) {
             http_response_code(404);
             echo json_encode(['error' => 'Product not found']);
             return;
         }
 
-        $fields = [];
-        $values = [];
-        foreach (['name', 'description', 'price', 'stock'] as $field) {
-            if (isset($data[$field])) {
-                $fields[] = "{$field} = ?";
-                $values[] = $data[$field];
-            }
-        }
-
-        if (empty($fields)) {
+        if (empty($data)) {
             http_response_code(400);
             echo json_encode(['error' => 'No fields to update']);
             return;
         }
 
-        $values[] = $id;
-        $sql = 'UPDATE products SET ' . implode(', ', $fields) . ' WHERE id = ?';
-        $this->db->prepare($sql)->execute($values);
+        if (isset($data['name']))        $product->setName($data['name']);
+        if (isset($data['description'])) $product->setDescription($data['description']);
+        if (isset($data['price']))       $product->setPrice((string) $data['price']);
+        if (isset($data['stock']))       $product->setStock((int) $data['stock']);
+        $this->em->flush();
 
         $this->cache->del("products:{$id}");
         $this->cache->del('products:all');
@@ -223,21 +213,19 @@ class Router
 
     private function deleteProduct(int $id): void
     {
-        try {
-            $stmt = $this->db->prepare('DELETE FROM products WHERE id = ?');
-            $stmt->execute([$id]);
-        } catch (\PDOException $e) {
-            if ($e->getCode() === '23000') {
-                http_response_code(409);
-                echo json_encode(['error' => 'Cannot delete product that is referenced by orders']);
-                return;
-            }
-            throw $e;
-        }
-
-        if ($stmt->rowCount() === 0) {
+        $product = $this->em->find(\App\Entity\Product::class, $id);
+        if (!$product) {
             http_response_code(404);
             echo json_encode(['error' => 'Product not found']);
+            return;
+        }
+
+        try {
+            $this->em->remove($product);
+            $this->em->flush();
+        } catch (\Doctrine\DBAL\Exception\ForeignKeyConstraintViolationException $e) {
+            http_response_code(409);
+            echo json_encode(['error' => 'Cannot delete product that is referenced by orders']);
             return;
         }
 
@@ -251,15 +239,15 @@ class Router
 
     private function listOrders(): void
     {
-        $stmt = $this->db->query('SELECT * FROM orders ORDER BY id DESC');
-        echo json_encode($stmt->fetchAll());
+        $orders = $this->em->getRepository(\App\Entity\Order::class)->findBy([], ['id' => 'DESC']);
+        echo json_encode(array_map([$this, 'serializeOrder'], $orders));
     }
 
     private function getOrder(int $id): void
     {
-        $stmt = $this->db->prepare('SELECT * FROM orders WHERE id = ?');
-        $stmt->execute([$id]);
-        $order = $stmt->fetch();
+        /** @var \App\Repository\OrderRepository $repo */
+        $repo = $this->em->getRepository(\App\Entity\Order::class);
+        $order = $repo->findWithItems($id);
 
         if (!$order) {
             http_response_code(404);
@@ -267,15 +255,7 @@ class Router
             return;
         }
 
-        $stmt = $this->db->prepare(
-            'SELECT oi.*, p.name as product_name FROM order_items oi
-             JOIN products p ON p.id = oi.product_id
-             WHERE oi.order_id = ?'
-        );
-        $stmt->execute([$id]);
-        $order['items'] = $stmt->fetchAll();
-
-        echo json_encode($order);
+        echo json_encode($this->serializeOrder($order));
     }
 
     private function createOrder(): void
@@ -288,55 +268,58 @@ class Router
             return;
         }
 
-        $this->db->beginTransaction();
+        $this->em->beginTransaction();
         try {
             // Create order
-            $this->db->prepare('INSERT INTO orders (total) VALUES (0)')->execute();
-            $orderId = (int) $this->db->lastInsertId();
+            $order = new \App\Entity\Order();
+            $this->em->persist($order);
+            $this->em->flush(); // flush to get order id for FK
 
-            $total = 0;
+            $total = 0.0;
             $productIds = [];
             foreach ($data['items'] as $item) {
                 if (!isset($item['product_id'], $item['quantity'])) {
                     throw new \InvalidArgumentException('Each item needs product_id and quantity');
                 }
-
                 if ((int) $item['quantity'] < 1) {
                     throw new \InvalidArgumentException('Quantity must be at least 1');
                 }
 
-                // Get product and check stock
-                $stmt = $this->db->prepare('SELECT * FROM products WHERE id = ? FOR UPDATE');
-                $stmt->execute([$item['product_id']]);
-                $product = $stmt->fetch();
+                // Lock product row to prevent overselling
+                $product = $this->em->find(
+                    \App\Entity\Product::class,
+                    $item['product_id'],
+                    LockMode::PESSIMISTIC_WRITE
+                );
 
                 if (!$product) {
                     throw new \InvalidArgumentException("Product {$item['product_id']} not found");
                 }
-                if ($product['stock'] < $item['quantity']) {
-                    throw new \InvalidArgumentException("Insufficient stock for {$product['name']}");
+                if ($product->getStock() < (int) $item['quantity']) {
+                    throw new \InvalidArgumentException("Insufficient stock for {$product->getName()}");
                 }
 
-                // Add order item
-                $lineTotal = (float) $product['price'] * (int) $item['quantity'];
-                $stmt = $this->db->prepare(
-                    'INSERT INTO order_items (order_id, product_id, quantity, price) VALUES (?, ?, ?, ?)'
-                );
-                $stmt->execute([$orderId, $item['product_id'], $item['quantity'], $product['price']]);
+                $lineTotal = (float) $product->getPrice() * (int) $item['quantity'];
 
-                // Decrease stock
-                $this->db->prepare('UPDATE products SET stock = stock - ? WHERE id = ?')
-                    ->execute([$item['quantity'], $item['product_id']]);
+                $orderItem = new \App\Entity\OrderItem();
+                $orderItem->setOrder($order);
+                $orderItem->setProduct($product);
+                $orderItem->setQuantity((int) $item['quantity']);
+                $orderItem->setPrice($product->getPrice());
+                $this->em->persist($orderItem);
+
+                $product->setStock($product->getStock() - (int) $item['quantity']);
 
                 $productIds[] = $item['product_id'];
                 $total += $lineTotal;
             }
 
-            // Update order total
-            $this->db->prepare('UPDATE orders SET total = ? WHERE id = ?')
-                ->execute([$total, $orderId]);
+            $order->setTotal(number_format($total, 2, '.', ''));
+            $this->em->flush();
+            $this->em->commit();
 
-            $this->db->commit();
+            // Clear identity map so getOrder reads fresh data
+            $this->em->clear();
 
             // Invalidate product caches
             foreach ($productIds as $pid) {
@@ -346,21 +329,59 @@ class Router
 
             // Publish order event to RabbitMQ
             Queue::publish('order_created', [
-                'order_id' => $orderId,
-                'total' => $total,
+                'order_id' => $order->getId(),
+                'total'    => $total,
                 'created_at' => date('c'),
             ]);
 
             http_response_code(201);
-            $this->getOrder($orderId);
+            $this->getOrder($order->getId());
         } catch (\InvalidArgumentException $e) {
-            $this->db->rollBack();
+            $this->em->rollBack();
             http_response_code(400);
             echo json_encode(['error' => $e->getMessage()]);
         } catch (\Exception $e) {
-            $this->db->rollBack();
+            $this->em->rollBack();
             http_response_code(500);
             echo json_encode(['error' => 'Order creation failed']);
         }
+    }
+
+    // --- Serialization helpers ---
+
+    private function serializeProduct(\App\Entity\Product $p): array
+    {
+        return [
+            'id'          => $p->getId(),
+            'name'        => $p->getName(),
+            'description' => $p->getDescription(),
+            'price'       => $p->getPrice(),
+            'stock'       => $p->getStock(),
+            'created_at'  => $p->getCreatedAt()->format('Y-m-d H:i:s'),
+            'updated_at'  => $p->getUpdatedAt()->format('Y-m-d H:i:s'),
+        ];
+    }
+
+    private function serializeOrder(\App\Entity\Order $o): array
+    {
+        $items = [];
+        foreach ($o->getItems() as $item) {
+            $items[] = [
+                'id'           => $item->getId(),
+                'order_id'     => $o->getId(),
+                'product_id'   => $item->getProduct()->getId(),
+                'product_name' => $item->getProduct()->getName(),
+                'quantity'     => $item->getQuantity(),
+                'price'        => $item->getPrice(),
+            ];
+        }
+        return [
+            'id'         => $o->getId(),
+            'status'     => $o->getStatus(),
+            'total'      => $o->getTotal(),
+            'created_at' => $o->getCreatedAt()->format('Y-m-d H:i:s'),
+            'updated_at' => $o->getUpdatedAt()->format('Y-m-d H:i:s'),
+            'items'      => $items,
+        ];
     }
 }
