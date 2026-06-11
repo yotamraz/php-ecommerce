@@ -139,8 +139,8 @@ class OrderPersistenceTest extends AbstractDoctrineTestCase
         $foundProduct = $this->em->find(Product::class, $product->getId());
         $this->em->remove($foundProduct);
 
-        // SQLite may not enforce FK constraints without PRAGMA foreign_keys=ON
-        // This test documents the intent; FK enforcement tested in live MySQL smoke tests
+        // PRAGMA foreign_keys=ON is enabled in AbstractDoctrineTestCase::setUp(),
+        // so SQLite will enforce the ON DELETE RESTRICT constraint on product_id.
         $this->expectException(\Throwable::class);
         $this->em->flush();
     }

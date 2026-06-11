@@ -30,6 +30,9 @@ abstract class AbstractDoctrineTestCase extends TestCase
         $schemaTool->createSchema(
             $this->em->getMetadataFactory()->getAllMetadata()
         );
+
+        // Enable FK constraint enforcement in SQLite (off by default)
+        $this->em->getConnection()->executeStatement('PRAGMA foreign_keys=ON');
     }
 
     protected function tearDown(): void
