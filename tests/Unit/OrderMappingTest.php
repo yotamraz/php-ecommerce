@@ -49,6 +49,8 @@ class OrderMappingTest extends TestCase
     {
         $this->assertSame('created_at', $this->meta->getColumnName('createdAt'));
         $this->assertSame('updated_at', $this->meta->getColumnName('updatedAt'));
+        $this->assertSame('datetime_immutable', $this->meta->getTypeOfField('createdAt'));
+        $this->assertSame('datetime_immutable', $this->meta->getTypeOfField('updatedAt'));
     }
 
     public function testItemsAssociationCascade(): void
