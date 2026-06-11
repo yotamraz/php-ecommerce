@@ -144,4 +144,109 @@ class OrderPersistenceTest extends AbstractDoctrineTestCase
         $this->expectException(\Throwable::class);
         $this->em->flush();
     }
+
+    /**
+     * Tests the explicit beginTransaction / flush / commit / clear / findWithItems
+     * sequence that mirrors the createOrder() handler in Router.php.
+     * Validates that after commit+clear, findWithItems returns the order with
+     * correctly populated items (not stale identity-map data) — Risk #2 mitigation.
+     */
+    public function testCreateOrderTransaction(): void
+    {
+        $product = $this->createProduct('Transactional Widget', '15.00', 10);
+        $this->em->flush();
+        $productId = $product->getId();
+
+        $this->em->beginTransaction();
+        try {
+            $order = new Order();
+            $this->em->persist($order);
+            $this->em->flush();
+
+            $qty = 3;
+            $lineTotal = (float) $product->getPrice() * $qty;
+
+            $item = new OrderItem();
+            $item->setOrder($order);
+            $item->setProduct($product);
+            $item->setQuantity($qty);
+            $item->setPrice($product->getPrice());
+            $this->em->persist($item);
+
+            $product->setStock($product->getStock() - $qty);
+            $order->setTotal(number_format($lineTotal, 2, '.', ''));
+            $this->em->flush();
+            $this->em->commit();
+        } catch (\Exception $e) {
+            $this->em->rollBack();
+            throw $e;
+        }
+
+        $orderId = $order->getId();
+
+        // Clear identity map — next reads must come from DB, not cache
+        $this->em->clear();
+
+        /** @var OrderRepository $repo */
+        $repo = $this->em->getRepository(Order::class);
+        $found = $repo->findWithItems($orderId);
+
+        $this->assertNotNull($found, 'Order must be retrievable after commit+clear');
+        // Compare as float: SQLite may strip trailing zeros ('45' vs '45.00')
+        $this->assertEqualsWithDelta(45.00, (float) $found->getTotal(), 0.001);
+
+        $items = $found->getItems()->toArray();
+        $this->assertCount(1, $items, 'Order must have exactly one item after commit+clear');
+        $this->assertSame(3, $items[0]->getQuantity());
+        // Compare as float: SQLite may strip trailing zeros ('15' vs '15.00')
+        $this->assertEqualsWithDelta(15.00, (float) $items[0]->getPrice(), 0.001);
+        $this->assertSame('Transactional Widget', $items[0]->getProduct()->getName());
+
+        // Stock decrement must also be persisted
+        $freshProduct = $this->em->find(Product::class, $productId);
+        $this->assertSame(7, $freshProduct->getStock());
+    }
+
+    /**
+     * Tests that a rollBack() on insufficient stock leaves the order unpersisted.
+     */
+    public function testCreateOrderRollbackOnInsufficientStock(): void
+    {
+        $product = $this->createProduct('Low-Stock Item', '25.00', 2);
+        $this->em->flush();
+
+        $this->em->beginTransaction();
+        $exceptionCaught = false;
+        $orderId = null;
+        try {
+            $order = new Order();
+            $this->em->persist($order);
+            $this->em->flush();
+            $orderId = $order->getId();
+
+            // Request more stock than available
+            $requestedQty = 5;
+            if ($product->getStock() < $requestedQty) {
+                throw new \InvalidArgumentException('Insufficient stock');
+            }
+        } catch (\InvalidArgumentException $e) {
+            $this->em->rollBack();
+            $exceptionCaught = true;
+        }
+
+        $this->assertTrue($exceptionCaught, 'Stock check exception must be caught');
+
+        // After rollback, clear the identity map to bypass any cached state
+        $this->em->clear();
+
+        // The order must not exist in the database after rollback
+        $this->assertNull(
+            $this->em->find(Order::class, $orderId),
+            'Order must not be persisted after transaction rollback'
+        );
+
+        // Product stock must be unchanged
+        $freshProduct = $this->em->find(Product::class, $product->getId());
+        $this->assertSame(2, $freshProduct->getStock(), 'Stock must not be decremented after rollback');
+    }
 }
