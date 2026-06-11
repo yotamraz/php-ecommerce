@@ -242,7 +242,7 @@ class Router
     private function listOrders(): void
     {
         $orders = $this->em->getRepository(\App\Entity\Order::class)->findBy([], ['id' => 'DESC']);
-        echo json_encode(array_map([$this, 'serializeOrder'], $orders));
+        echo json_encode(array_map([$this, 'serializeOrderSummary'], $orders));
     }
 
     private function getOrder(int $id): void
@@ -364,6 +364,25 @@ class Router
         ];
     }
 
+    /**
+     * Summary serialization for list endpoints — omits the items collection
+     * to preserve the pre-migration GET /api/orders response shape.
+     */
+    private function serializeOrderSummary(\App\Entity\Order $o): array
+    {
+        return [
+            'id'         => $o->getId(),
+            'status'     => $o->getStatus(),
+            'total'      => $o->getTotal(),
+            'created_at' => $o->getCreatedAt()->format('Y-m-d H:i:s'),
+            'updated_at' => $o->getUpdatedAt()->format('Y-m-d H:i:s'),
+        ];
+    }
+
+    /**
+     * Full serialization for single-order endpoints — includes hydrated items.
+     * Used by getOrder() and createOrder() (201 response).
+     */
     private function serializeOrder(\App\Entity\Order $o): array
     {
         $items = [];
