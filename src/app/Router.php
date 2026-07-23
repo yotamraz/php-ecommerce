@@ -144,7 +144,7 @@ class Router
 
         if (empty($products)) {
             http_response_code(404);
-            echo json_encode(['error' => 'No products found']);
+            echo json_encode(['error' => 'Not found']);
             return;
         }
 
@@ -167,7 +167,7 @@ class Router
 
         if (!$product) {
             http_response_code(404);
-            echo json_encode(['error' => 'Product not found']);
+            echo json_encode(['error' => 'Not found']);
             return;
         }
 
@@ -223,7 +223,7 @@ class Router
         $stmt->execute([$id]);
         if (!$stmt->fetch()) {
             http_response_code(404);
-            echo json_encode(['error' => 'Product not found']);
+            echo json_encode(['error' => 'Not found']);
             return;
         }
 
@@ -268,7 +268,7 @@ class Router
 
         if ($stmt->rowCount() === 0) {
             http_response_code(404);
-            echo json_encode(['error' => 'Product not found']);
+            echo json_encode(['error' => 'Not found']);
             return;
         }
 
@@ -286,7 +286,7 @@ class Router
 
         if (empty($orders)) {
             http_response_code(404);
-            echo json_encode(['error' => 'No orders found']);
+            echo json_encode(['error' => 'Not found']);
             return;
         }
 
@@ -301,7 +301,7 @@ class Router
 
         if (!$order) {
             http_response_code(404);
-            echo json_encode(['error' => 'Order not found']);
+            echo json_encode(['error' => 'Not found']);
             return;
         }
 
@@ -429,7 +429,7 @@ class Router
 
         if (empty($campaigns)) {
             http_response_code(404);
-            echo json_encode(['error' => 'No campaigns found']);
+            echo json_encode(['error' => 'Not found']);
             return;
         }
 
@@ -442,7 +442,7 @@ class Router
 
         if (empty($campaigns)) {
             http_response_code(404);
-            echo json_encode(['error' => 'No active campaigns found']);
+            echo json_encode(['error' => 'Not found']);
             return;
         }
 
@@ -454,7 +454,7 @@ class Router
         $campaign = $this->campaigns->find($id);
         if (!$campaign) {
             http_response_code(404);
-            echo json_encode(['error' => 'Campaign not found']);
+            echo json_encode(['error' => 'Not found']);
             return;
         }
         echo json_encode($campaign);
@@ -502,7 +502,7 @@ class Router
 
         if ($error === 'not_found') {
             http_response_code(404);
-            echo json_encode(['error' => 'Campaign not found']);
+            echo json_encode(['error' => 'Not found']);
             return;
         }
         if ($error !== null) {
@@ -520,7 +520,7 @@ class Router
 
         if ($error === 'not_found') {
             http_response_code(404);
-            echo json_encode(['error' => 'Campaign not found']);
+            echo json_encode(['error' => 'Not found']);
             return;
         }
         if ($error === 'referenced') {
