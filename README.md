@@ -39,6 +39,8 @@ docker logs -f ecommerce-php
 
 ## API Endpoints
 
+Collection endpoints (`GET /api/products`, `/api/orders`, `/api/campaigns`, `/api/campaigns/active`) return `404` when no matching rows exist.
+
 ### Health
 
 ```
@@ -89,22 +91,82 @@ POST /api/orders          # create
 
 Order creation validates stock, decrements inventory, calculates totals, and publishes an `order_created` event to RabbitMQ.
 
+**Apply a coupon** by adding `coupon_code` to the order body:
+
+```json
+{
+  "items": [{ "product_id": 1, "quantity": 2 }],
+  "coupon_code": "LAUNCH10"
+}
+```
+
+The campaign discount is applied to the total, and `campaign_id` / `discount_amount` are recorded on the order.
+
+### Campaigns
+
+Pricing campaigns: `percent_off` or `fixed_off`, with an optional coupon code, date window, status, and usage limit.
+
+```
+GET    /api/campaigns            # list all (optional ?status=active)
+GET    /api/campaigns/active     # active + within date window
+GET    /api/campaigns/:id        # get one
+POST   /api/campaigns            # create
+PUT    /api/campaigns/:id        # update fields / status
+DELETE /api/campaigns/:id        # delete (409 if referenced by orders)
+POST   /api/campaigns/validate   # check a coupon code
+```
+
+**Create / Update body:**
+
+```json
+{
+  "name": "Launch 10% Off",
+  "description": "10% off any order",
+  "type": "percent_off",
+  "value": 10,
+  "coupon_code": "LAUNCH10",
+  "starts_at": "2020-01-01 00:00:00",
+  "ends_at": "2030-01-01 00:00:00",
+  "status": "active",
+  "usage_limit": null
+}
+```
+
+`type` is `percent_off` (value = 0-100) or `fixed_off` (value = amount). `status` is one of `draft`, `active`, `paused`, `ended`. A campaign is applied only when `active`, within its date window, and under its `usage_limit`.
+
+**Validate body:**
+
+```json
+{ "coupon_code": "LAUNCH10" }
+```
+
+Returns `{ "valid": true, "campaign": { ... } }`, or `404` with `{ "valid": false }` if not usable.
+
 ## Example Session
+
+The database starts empty. Example rows live in [`data/`](data/) as CSV (`products.csv`, `campaigns.csv`); collection endpoints return `404` until you create data.
 
 ```bash
 # Check services
 curl http://localhost:8080/health
 
-# Browse products (5 seeded)
-curl http://localhost:8080/api/products
+# Empty DB -> 404
+curl -i http://localhost:8080/api/products
 
-# Place an order
+# Create a product (values from data/products.csv)
+curl -X POST http://localhost:8080/api/products \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"Wireless Mouse","description":"Ergonomic wireless mouse with USB receiver","price":29.99,"stock":150}'
+
+# Create an active coupon campaign (values from data/campaigns.csv)
+curl -X POST http://localhost:8080/api/campaigns \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"Launch 10% Off","type":"percent_off","value":10,"coupon_code":"LAUNCH10","status":"active"}'
+
+# Place a discounted order
 curl -X POST http://localhost:8080/api/orders \
   -H 'Content-Type: application/json' \
-  -d '{"items":[{"product_id":1,"quantity":2}]}'
-
-# Verify stock decreased
-curl http://localhost:8080/api/products/1
+  -d '{"items":[{"product_id":1,"quantity":2}],"coupon_code":"LAUNCH10"}'
 ```
 
 ## Project Structure
@@ -116,15 +178,17 @@ curl http://localhost:8080/api/products/1
 ├── entrypoint.sh           # composer install at startup
 ├── run.sh                  # convenience shell runner
 ├── nginx/default.conf      # nginx -> php-fpm proxy
-├── db/init.sql             # schema + seed data
+├── db/init.sql             # schema only (no seed data)
+├── data/                   # example rows as CSV (not auto-loaded)
 └── src/
     ├── composer.json
     ├── public/index.php    # entry point
     └── app/
-        ├── Database.php    # PDO/MySQL connection
-        ├── Cache.php       # Redis (Predis) connection
-        ├── Queue.php       # RabbitMQ publisher
-        └── Router.php      # REST API routing + handlers
+        ├── Database.php        # PDO/MySQL connection
+        ├── Cache.php           # Redis (Predis) connection
+        ├── Queue.php           # RabbitMQ publisher
+        ├── CampaignService.php # Campaign CRUD + discount logic
+        └── Router.php          # REST API routing + handlers
 ```
 
 ## Ports

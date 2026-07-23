@@ -11,12 +11,14 @@ class Router
     private PDO $db;
     private RedisClient $cache;
     private AMQPStreamConnection $queue;
+    private CampaignService $campaigns;
 
     public function __construct(PDO $db, RedisClient $cache, AMQPStreamConnection $queue)
     {
         $this->db = $db;
         $this->cache = $cache;
         $this->queue = $queue;
+        $this->campaigns = new CampaignService($db);
     }
 
     public function handleRequest(): void
@@ -58,6 +60,29 @@ class Router
                 break;
             case $uri === '/api/orders' && $method === 'POST':
                 $this->createOrder();
+                break;
+
+            // Campaigns
+            case $uri === '/api/campaigns' && $method === 'GET':
+                $this->listCampaigns();
+                break;
+            case $uri === '/api/campaigns/active' && $method === 'GET':
+                $this->listActiveCampaigns();
+                break;
+            case $uri === '/api/campaigns/validate' && $method === 'POST':
+                $this->validateCoupon();
+                break;
+            case $uri === '/api/campaigns' && $method === 'POST':
+                $this->createCampaign();
+                break;
+            case preg_match('#^/api/campaigns/(\d+)$#', $uri, $m) && $method === 'GET':
+                $this->getCampaign((int) $m[1]);
+                break;
+            case preg_match('#^/api/campaigns/(\d+)$#', $uri, $m) && $method === 'PUT':
+                $this->updateCampaign((int) $m[1]);
+                break;
+            case preg_match('#^/api/campaigns/(\d+)$#', $uri, $m) && $method === 'DELETE':
+                $this->deleteCampaign((int) $m[1]);
                 break;
 
             default:
@@ -116,6 +141,12 @@ class Router
 
         $stmt = $this->db->query('SELECT * FROM products ORDER BY id');
         $products = $stmt->fetchAll();
+
+        if (empty($products)) {
+            http_response_code(404);
+            echo json_encode(['error' => 'No products found']);
+            return;
+        }
 
         $json = json_encode($products);
         $this->cache->setex('products:all', 60, $json);
@@ -251,8 +282,15 @@ class Router
 
     private function listOrders(): void
     {
-        $stmt = $this->db->query('SELECT * FROM orders ORDER BY id DESC');
-        echo json_encode($stmt->fetchAll());
+        $orders = $this->db->query('SELECT * FROM orders ORDER BY id DESC')->fetchAll();
+
+        if (empty($orders)) {
+            http_response_code(404);
+            echo json_encode(['error' => 'No orders found']);
+            return;
+        }
+
+        echo json_encode($orders);
     }
 
     private function getOrder(int $id): void
@@ -332,9 +370,25 @@ class Router
                 $total += $lineTotal;
             }
 
-            // Update order total
-            $this->db->prepare('UPDATE orders SET total = ? WHERE id = ?')
-                ->execute([$total, $orderId]);
+            // Apply coupon campaign, if supplied
+            $campaignId = null;
+            $discount = 0.0;
+            if (!empty($data['coupon_code'])) {
+                $campaign = $this->campaigns->findByCoupon((string) $data['coupon_code']);
+                if (!$campaign || !$this->campaigns->isRunnable($campaign)) {
+                    throw new \InvalidArgumentException('Invalid or inactive coupon code');
+                }
+                $discount = $this->campaigns->computeDiscount((float) $total, $campaign);
+                $campaignId = (int) $campaign['id'];
+                $this->campaigns->incrementUsage($campaignId);
+            }
+
+            $finalTotal = round((float) $total - $discount, 2);
+
+            // Update order total + applied campaign
+            $this->db->prepare(
+                'UPDATE orders SET total = ?, campaign_id = ?, discount_amount = ? WHERE id = ?'
+            )->execute([$finalTotal, $campaignId, $discount, $orderId]);
 
             $this->db->commit();
 
@@ -347,7 +401,9 @@ class Router
             // Publish order event to RabbitMQ
             Queue::publish('order_created', [
                 'order_id' => $orderId,
-                'total' => $total,
+                'total' => $finalTotal,
+                'discount_amount' => $discount,
+                'campaign_id' => $campaignId,
                 'created_at' => date('c'),
             ]);
 
@@ -362,5 +418,138 @@ class Router
             http_response_code(500);
             echo json_encode(['error' => 'Order creation failed']);
         }
+    }
+
+    // --- Campaigns ---
+
+    private function listCampaigns(): void
+    {
+        $status = $_GET['status'] ?? null;
+        $campaigns = $this->campaigns->all($status !== null ? (string) $status : null);
+
+        if (empty($campaigns)) {
+            http_response_code(404);
+            echo json_encode(['error' => 'No campaigns found']);
+            return;
+        }
+
+        echo json_encode($campaigns);
+    }
+
+    private function listActiveCampaigns(): void
+    {
+        $campaigns = $this->campaigns->active();
+
+        if (empty($campaigns)) {
+            http_response_code(404);
+            echo json_encode(['error' => 'No active campaigns found']);
+            return;
+        }
+
+        echo json_encode($campaigns);
+    }
+
+    private function getCampaign(int $id): void
+    {
+        $campaign = $this->campaigns->find($id);
+        if (!$campaign) {
+            http_response_code(404);
+            echo json_encode(['error' => 'Campaign not found']);
+            return;
+        }
+        echo json_encode($campaign);
+    }
+
+    private function createCampaign(): void
+    {
+        $data = json_decode(file_get_contents('php://input'), true) ?? [];
+
+        try {
+            [$campaign, $error] = $this->campaigns->create($data);
+        } catch (\PDOException $e) {
+            if ($e->getCode() === '23000') {
+                http_response_code(409);
+                echo json_encode(['error' => 'coupon_code already exists']);
+                return;
+            }
+            throw $e;
+        }
+
+        if ($error !== null) {
+            http_response_code(400);
+            echo json_encode(['error' => $error]);
+            return;
+        }
+
+        http_response_code(201);
+        echo json_encode($campaign);
+    }
+
+    private function updateCampaign(int $id): void
+    {
+        $data = json_decode(file_get_contents('php://input'), true) ?? [];
+
+        try {
+            [$campaign, $error] = $this->campaigns->update($id, $data);
+        } catch (\PDOException $e) {
+            if ($e->getCode() === '23000') {
+                http_response_code(409);
+                echo json_encode(['error' => 'coupon_code already exists']);
+                return;
+            }
+            throw $e;
+        }
+
+        if ($error === 'not_found') {
+            http_response_code(404);
+            echo json_encode(['error' => 'Campaign not found']);
+            return;
+        }
+        if ($error !== null) {
+            http_response_code(400);
+            echo json_encode(['error' => $error === 'no_fields' ? 'No fields to update' : $error]);
+            return;
+        }
+
+        echo json_encode($campaign);
+    }
+
+    private function deleteCampaign(int $id): void
+    {
+        $error = $this->campaigns->delete($id);
+
+        if ($error === 'not_found') {
+            http_response_code(404);
+            echo json_encode(['error' => 'Campaign not found']);
+            return;
+        }
+        if ($error === 'referenced') {
+            http_response_code(409);
+            echo json_encode(['error' => 'Cannot delete campaign that is referenced by orders']);
+            return;
+        }
+
+        http_response_code(204);
+    }
+
+    // Check a coupon code without placing an order.
+    private function validateCoupon(): void
+    {
+        $data = json_decode(file_get_contents('php://input'), true) ?? [];
+
+        if (empty($data['coupon_code'])) {
+            http_response_code(400);
+            echo json_encode(['error' => 'coupon_code is required']);
+            return;
+        }
+
+        $campaign = $this->campaigns->findByCoupon((string) $data['coupon_code']);
+        if (!$campaign || !$this->campaigns->isRunnable($campaign)) {
+            http_response_code(404);
+            echo json_encode(['valid' => false, 'error' => 'Invalid or inactive coupon code']);
+            return;
+        }
+
+        echo json_encode(['valid' => true, 'campaign' => $campaign]);
     }
 }
